@@ -52,8 +52,8 @@ UI 側の詳細設計原則は [UI仕様（共通）](./specs/ui/common.md)、�
 3. ユーザーが新規チャット開始または既存チャットを開く操作を行うと、対象チャットのチャットモーダルを表示する。
 4. ユーザーがモーダル内でメッセージを送信すると、`POST /api/chats/{channel_id}/messages` を通じて対象チャットにメッセージ履歴が追加され、必要に応じてチャンネル名が自動生成される。
 5. API は回答生成処理を起動し、基盤側では過去の訂正ルールと Good / Bad フィードバックを参照して回答を生成する。
-6. ユーザーは AI メッセージに対して `POST /api/chats/{channel_id}/messages/{messageId}/feedback` を通じて Good / Bad フィードバックを送信でき、その評価は以後の回答生成に利用される。
-7. ユーザーが特定の AI メッセージに対して訂正を送信した場合、`POST /api/chats/{channel_id}/messages/{messageId}/correct` を通じて次回以降に守るべきルールを抽出し、ベクトル化して保存する。
+6. ユーザーは AI メッセージに対して `POST /api/chats/{channel_id}/messages/{message_id}/feedback` を通じて Good / Bad フィードバックを送信でき、その評価は以後の回答生成に利用される。
+7. ユーザーが特定の AI メッセージに対して訂正を送信した場合、`POST /api/chats/{channel_id}/messages/{message_id}/correct` を通じて次回以降に守るべきルールを抽出し、ベクトル化して保存する。
 
 ## 6. 仕様一覧
 

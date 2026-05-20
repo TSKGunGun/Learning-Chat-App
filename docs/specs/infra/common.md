@@ -29,8 +29,8 @@
 バックエンドは Hono を用いた API サーバーとして実行する。
 
 - API サーバーは Node.js 実行環境上で動作する
-- UI からの `POST /api/auth/login`、`GET /api/chats`、`POST /api/chats`、`GET /api/chats/{channel_id}`、`DELETE /api/chats/{channel_id}`、`POST /api/chats/{channel_id}/messages`、`POST /api/chats/{channel_id}/messages/{messageId}/feedback`、`POST /api/chats/{channel_id}/messages/{messageId}/correct` を受け付ける
-- API サーバーはデータベース、OpenAI API、LangChain.js と連携して応答生成と自己学習処理を実行する
+- UI からの `POST /api/auth/login`、`GET /api/chats`、`POST /api/chats`、`GET /api/chats/{channel_id}`、`DELETE /api/chats/{channel_id}`、`POST /api/chats/{channel_id}/messages`、`POST /api/chats/{channel_id}/messages/{message_id}/feedback`、`POST /api/chats/{channel_id}/messages/{message_id}/correct` を受け付ける
+- API サーバーはデータベースと外部 AI サービスへ接続して動作する
 - API エンドポイントの正本は [../api/common.md](../api/common.md) を参照する
 
 ## 5. 外部接続前提
@@ -39,4 +39,3 @@ API サーバーは以下の外部接続を前提とする。
 
 - PostgreSQL + `pgvector`: チャット履歴と訂正ルールの保存、類似度検索
 - OpenAI API: チャット回答生成、ルール要約、埋め込み生成
-- LangChain.js: プロンプト構築、RAG 実行、自己学習チェーンの制御

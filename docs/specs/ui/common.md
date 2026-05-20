@@ -10,7 +10,7 @@
 
 UIは、ユーザー向け画面の提供と、初期表示およびユーザー操作に応じたバックエンドAPI呼び出しを担う。
 
-- チャット画面または履歴画面の初期表示
+- トップ画面の初期表示
 - チャット送信操作の受付
 - AI メッセージへのフィードバック送信操作の受付
 - 訂正送信操作の受付
@@ -65,6 +65,7 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - 通信はクライアントサイドで行う
 - 実装例として SWR 等の利用を想定する
 - バックエンドから返却されたAI回答をチャットUIへ反映する
+- 返却される AI メッセージの `message_id` と `ai_feedback` を UI 状態へ反映する
 - 最初のメッセージ送信で更新後の `channel_name` を受け取った場合は、チャット一覧データをリフレッシュする
 
 この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{channel_id}/messages` とする。
@@ -77,7 +78,7 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - UIは入力受付と結果表示を担う
 - ルール抽出や保存処理自体はバックエンド側で実行する
 
-この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{channel_id}/messages/{messageId}/correct` とする。
+この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{channel_id}/messages/{message_id}/correct` とする。
 
 ## 8. フィードバック送信
 
@@ -88,7 +89,7 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - フィードバック送信時は `feedback` を boolean で送り、`true` を Good、`false` を Bad として扱う
 - 保存されたフィードバックは、以後の回答生成に利用される前提とする
 
-この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{channel_id}/messages/{messageId}/feedback` とする。
+この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{channel_id}/messages/{message_id}/feedback` とする。
 
 ## 9. 認証画面の前提
 
@@ -97,6 +98,7 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - 入力は `username` と `password` のみとする
 - 認証方式は Cookie セッションとする
 - ログイン成功後、UI は `/` へリダイレクトする
+- 未認証状態でトップ画面またはチャット関連 API にアクセスした場合、UI は `/login` へ遷移する
 
 詳細は [login.md](./pages/login.md) を参照する。
 

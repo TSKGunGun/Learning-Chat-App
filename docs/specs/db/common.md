@@ -61,7 +61,7 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 - `created_at` (Timestamp)
 
 `messages` テーブルにより、1 つのチャットチャンネルに対して複数のメッセージ履歴を保持する。
-`ai_feedback` は AI メッセージに対する Good / Bad 評価を保持し、以後の回答生成時に学習シグナルとして参照する。
+`ai_feedback` は AI メッセージに対する Good / Bad 評価を保持し、以後の回答生成時に学習シグナルとして参照する。nullを許容し、未評価時はnullとする。
 
 ### `correction_rules` テーブル
 
@@ -88,8 +88,8 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 `GET /api/chats/{channel_id}` および `POST /api/chats/{channel_id}/messages` では `messages` をチャット履歴として参照または追加する。
 `POST /api/chats/{channel_id}/messages` では、対象チャットの最初のユーザーメッセージ送信時に `channel_name` を会話内容から自動生成した名称へ更新する。
 `POST /api/chats/{channel_id}/messages` では `correction_rules` と `messages.ai_feedback` を学習データとして参照する。
-`POST /api/chats/{channel_id}/messages/{messageId}/feedback` では対象 AI メッセージの `ai_feedback` を更新する。
-`POST /api/chats/{channel_id}/messages/{messageId}/correct` では対象 AI メッセージに対する訂正をもとにルールと埋め込みを `correction_rules` に保存する。
+`POST /api/chats/{channel_id}/messages/{message_id}/feedback` では対象 AI メッセージの `ai_feedback` を更新する。
+`POST /api/chats/{channel_id}/messages/{message_id}/correct` では対象 AI メッセージに対する訂正をもとにルールと埋め込みを `correction_rules` に保存する。
 
 ## 5. ORM とベクトル検索
 

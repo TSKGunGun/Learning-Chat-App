@@ -29,6 +29,8 @@ UI は LINE のようなチャット画面を前提とし、会話の流れを�
 
 - 既存チャットを開く場合は、`GET /api/chats/{channel_id}` を利用して対象チャットを取得する
 - モーダル内には対象チャットのチャット履歴を表示する
+- チャット履歴の各メッセージは必ず `message_id` を保持する。
+- AIメッセージは `ai_feedback` を保持する。ai_feedbackはnullを許容する。
 - 表示対象はログイン済みユーザー自身のチャットに限る
 
 ## 6. UI構成
@@ -44,9 +46,10 @@ UI は LINE のようなチャット画面を前提とし、会話の流れを�
 
 - モーダル内ではチャット履歴の表示を行う
 - モーダル内からメッセージ送信を行う場合は、対象チャットの `channel_id` を path parameter に含む `POST /api/chats/{channel_id}/messages` を利用する前提とする
+- メッセージ送信成功後は、返却された AI メッセージの `message_id` と `ai_feedback` を UI 状態に反映する
 - 最初のメッセージ送信により更新後の `channel_name` が返却された場合、トップ画面のチャット一覧をリフレッシュできるようにする
-- モーダル内から AI メッセージへのフィードバック送信を行う場合は、対象チャットの `channel_id` と対象 AI メッセージの `messageId` を path parameter に含む `POST /api/chats/{channel_id}/messages/{messageId}/feedback` を利用する前提とする
-- モーダル内から訂正送信を行う場合は、対象チャットの `channel_id` と対象 AI メッセージの `messageId` を path parameter に含む `POST /api/chats/{channel_id}/messages/{messageId}/correct` を利用する前提とする
+- モーダル内から AI メッセージへのフィードバック送信を行う場合は、対象チャットの `channel_id` と対象 AI メッセージの `message_id` を path parameter に含む `POST /api/chats/{channel_id}/messages/{message_id}/feedback` を利用する前提とする
+- モーダル内から訂正送信を行う場合は、対象チャットの `channel_id` と対象 AI メッセージの `message_id` を path parameter に含む `POST /api/chats/{channel_id}/messages/{message_id}/correct` を利用する前提とする
 
 ## 8. 送信可能な内容
 
@@ -58,4 +61,4 @@ UI は LINE のようなチャット画面を前提とし、会話の流れを�
 
 - モーダルの詳細なレイアウト
 - モーダルのサイズやアニメーション
-- 未ログイン時のモーダル表示制御
+- 未ログイン時のモーダルの詳細な表示制御
