@@ -46,10 +46,11 @@ UI は LINE のようなチャット画面を前提とし、会話の流れを�
 
 - モーダル内ではチャット履歴の表示を行う
 - モーダル内からメッセージ送信を行う場合は、対象チャットの `channel_id` を path parameter に含む `POST /api/chats/{channel_id}/messages` を利用する前提とする
-- メッセージ送信成功後は、返却された AI メッセージの `message_id` と `ai_feedback` を UI 状態に反映する
-- 最初のメッセージ送信により更新後の `channel_name` が返却された場合、トップ画面のチャット一覧をリフレッシュできるようにする
+- メッセージ送信成功後は、返却されたユーザーメッセージを UI 状態に反映する
+- メッセージ送信後は `GET /api/chats/{channel_id}` を再取得し、バックエンド内で生成・更新された AI 応答をチャット履歴へ反映する
+- メッセージ送信後は `last_messaged_at` と `channel_name` の更新に追従するため、トップ画面のチャット一覧をリフレッシュできるようにする
 - モーダル内から AI メッセージへのフィードバック送信を行う場合は、対象チャットの `channel_id` と対象 AI メッセージの `message_id` を path parameter に含む `POST /api/chats/{channel_id}/messages/{message_id}/feedback` を利用する前提とする
-- モーダル内から訂正送信を行う場合は、対象チャットの `channel_id` と対象 AI メッセージの `message_id` を path parameter に含む `POST /api/chats/{channel_id}/messages/{message_id}/correct` を利用する前提とする
+- AI に訂正を求める場合も通常のメッセージ送信 API を利用し、対象チャットの全履歴をもとに本文の意図判定はバックエンド側で行う
 
 ## 8. 送信可能な内容
 

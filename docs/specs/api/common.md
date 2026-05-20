@@ -8,7 +8,7 @@
 
 ## 2. APIの責務
 
-APIは、UIからのリクエストを受け取り、チャット履歴取得、回答生成、フィードバック受付、訂正受付の入口として振る舞う。
+APIは、UIからのリクエストを受け取り、チャット履歴取得、回答生成、フィードバック受付の入口として振る舞う。
 
 - UI向けのHTTPエンドポイントを公開する
 - ログイン要求を受けて認証とセッション確立を行う
@@ -18,7 +18,6 @@ APIは、UIからのリクエストを受け取り、チャット履歴取得、
 - チャット削除要求を受けて対象チャットを削除する
 - チャット単位のメッセージ送信要求を受けて回答生成処理を起動する
 - 対象メッセージへのフィードバック要求を受けて評価保存と学習データ更新を行う
-- 対象メッセージへの訂正要求を受けてルール抽出と保存処理を起動する
 
 採用技術は Node.js、Hono、TypeScript とする。Hono はフレームワーク層として扱い、API はクリーンアーキテクチャにおける入口層とする。
 
@@ -47,7 +46,6 @@ APIエンドポイントの正本は本章とする。
 | `DELETE` | `/api/chats/{channel_id}` | 既存チャットの削除 | クライアントサイド |
 | `POST` | `/api/chats/{channel_id}/messages` | 指定チャットへの新規メッセージ送信（回答生成の起動） | クライアントサイド |
 | `POST` | `/api/chats/{channel_id}/messages/{message_id}/feedback` | 指定 AI メッセージへの Good / Bad フィードバック送信 | クライアントサイド |
-| `POST` | `/api/chats/{channel_id}/messages/{message_id}/correct` | 指定 AI メッセージに対する訂正の送信（ルール抽出・保存処理の起動） | クライアントサイド |
 
 ## 5. リクエストごとの処理責務
 
@@ -71,7 +69,6 @@ APIエンドポイントの正本は本章とする。
 - `DELETE /api/chats/{channel_id}`
 - `POST /api/chats/{channel_id}/messages`
 - `POST /api/chats/{channel_id}/messages/{message_id}/feedback`
-- `POST /api/chats/{channel_id}/messages/{message_id}/correct`
 
 上記のチャット関連 API はログイン済みユーザーのみ利用できる前提とし、未認証または認証切れの場合は `401` を返す。
 
@@ -79,7 +76,8 @@ APIエンドポイントの正本は本章とする。
 
 - ログイン済みユーザーのチャット一覧を返す
 - トップ画面の初期表示で利用される
-- 返却内容には各チャットの `channel_id` と `channel_name` を含む前提とする
+- 返却内容には各チャットの `channel_id`、`channel_name`、`last_messaged_at` を含む前提とする
+- 一覧の並び順は `last_messaged_at` の降順を前提とする
 - 返却対象となる永続化データの詳細は [../db/common.md](../db/common.md) を参照する
 
 ### `POST /api/chats`
@@ -91,30 +89,34 @@ APIエンドポイントの正本は本章とする。
 
 ### `GET /api/chats/{channel_id}`
 
-- 指定されたチャット ID に対応する既存チャットを返す
+- 指定されたチャンネル ID に対応する既存チャットを返す
 - 既存チャットを開く操作から利用される
-- 返却内容には対象チャットの `channel_id`、`channel_name`、チャット履歴を含む前提とする
+- 返却内容には対象チャットの `channel_id`、`channel_name`、`last_messaged_at`、チャット履歴を含む前提とする
 - チャット履歴の各メッセージは少なくとも `message_id`、`sender_type`、`message_text`、`ai_feedback`、`created_at` を含む前提とする
+- チャット履歴は `created_at` の昇順で返す前提とする
 - ログイン済みユーザー自身のチャットのみ取得対象とする
 
 ### `DELETE /api/chats/{channel_id}`
 
-- 指定されたチャット ID に対応する既存チャットを削除する
+- 指定されたチャンネル ID に対応する既存チャットを削除する
 - チャット削除操作から利用される
 - ログイン済みユーザー自身のチャットのみ削除対象とする
 
 ### `POST /api/chats/{channel_id}/messages`
 
 - path parameter として `channel_id` を受け取る
+- リクエスト本文として `message_text` を受け取る
+- `message_text` はユーザーが入力したメッセージ本文であり、文字列型とする
 - 指定チャットへの新規メッセージを受け取る
 - 回答生成処理を起動する
 - 追加されたユーザーメッセージと生成された AI メッセージは `messages` として扱う
+- 新規メッセージ追加時に `last_messaged_at` を更新する
 - 対象チャットが最初のユーザーメッセージ送信前であり、チャンネル名が `新規チャット` の場合は、この処理の中で最初の会話内容からチャンネル名を自動生成して更新する
-- チャンネル名を更新した場合、応答には更新後の `channel_name` を含める
-- 応答には少なくとも `channel_id` を含める
-- 応答には生成された AI メッセージの `message_id`、`sender_type`、`message_text`、`ai_feedback`、`created_at` を含める
+- 応答には追加されたユーザーメッセージの `message_id`、`sender_type`、`message_text`、`created_at` のみを含める
+- AI による応答メッセージはバックエンド内の処理で完結するため、本 API のレスポンスでは返却対象としない
 - 回答生成では、基盤側で埋め込み生成、類似ルール検索、プロンプト構築、LLM実行を行う
 - 回答生成では、`correction_rules` に加えて過去の `messages.ai_feedback` を学習データとして参照する
+- ユーザーの `message_text` に AI への訂正意図が含まれる場合、対象チャットの全履歴を訂正対象として、同一 API の処理内で自己訂正とルール抽出を行う
 - ルール検索対象となるデータの詳細は [../db/common.md](../db/common.md) を参照する
 - 実行基盤の詳細は [../infra/common.md](../infra/common.md) を参照する
 
@@ -129,15 +131,6 @@ APIエンドポイントの正本は本章とする。
 - 成功時は更新後の `message_id` と `ai_feedback` を返す前提とする
 - 保存対象となるデータの詳細は [../db/common.md](../db/common.md) を参照する
 
-### `POST /api/chats/{channel_id}/messages/{message_id}/correct`
-
-- path parameter として `channel_id` と `message_id` を受け取る
-- 指定された AI メッセージに対する訂正内容を受け取る
-- 訂正内容をもとにルール抽出とベクトル保存処理を起動する
-- 訂正対象メッセージは AI 出力である前提とする
-- 保存対象となるデータの詳細は [../db/common.md](../db/common.md) を参照する
-- ルール抽出と埋め込み生成の基盤詳細は [../infra/common.md](../infra/common.md) を参照する
-
 ## 6. UIとのインターフェース前提
 
 APIは以下の前提でUIから利用される。
@@ -150,8 +143,8 @@ APIは以下の前提でUIから利用される。
 - 新規チャット開始および既存チャットを開く操作では、トップ画面上のチャットモーダルを表示する
 - 初期データ読み込みは RSC 経由で行い、`401` の場合は `/login` へ遷移する
 - メッセージ送信は `POST /api/chats/{channel_id}/messages` を利用する
-- 最初のメッセージ送信で `channel_name` が返却された場合、UI はチャット一覧データをリフレッシュする
+- メッセージ送信後は `last_messaged_at` と `channel_name` の更新に追従するため、UI はチャット一覧データを再取得してリフレッシュする
 - フィードバック送信は `POST /api/chats/{channel_id}/messages/{message_id}/feedback` を利用する
-- 訂正送信は `POST /api/chats/{channel_id}/messages/{message_id}/correct` を利用する
+- 訂正を求める場合も通常のメッセージ送信 API を利用し、本文の意図判定はバックエンド側で行う
 - クライアントサイド通信で `401` を受けた場合、UI は `/login` へ遷移する
 - `hono/rpc` を通じてフロントエンドと型共有できる構成を前提とする

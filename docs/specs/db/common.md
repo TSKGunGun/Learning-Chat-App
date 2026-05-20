@@ -43,6 +43,7 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key): チャット所有者のユーザー ID
 - `channel_name` (Text): チャンネル名。新規作成時は `新規チャット` を保持し、最初のユーザーメッセージ送信時に会話内容から自動生成した名称へ更新する
+- `last_messaged_at` (Timestamp, Nullable): 最後にメッセージが追加された日時。新規メッセージ追加時に更新する
 - `created_at` (Timestamp)
 - `updated_at` (Timestamp)
 
@@ -86,10 +87,11 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 `GET /api/chats`、`POST /api/chats`、`GET /api/chats/{channel_id}`、`DELETE /api/chats/{channel_id}` では `chat_channels` をログイン済みユーザー単位で参照または更新する。
 `POST /api/chats` では `channel_name` が `新規チャット` のチャットチャンネルを作成する。
 `GET /api/chats/{channel_id}` および `POST /api/chats/{channel_id}/messages` では `messages` をチャット履歴として参照または追加する。
+`POST /api/chats/{channel_id}/messages` では、新規メッセージ追加時に `chat_channels.last_messaged_at` を更新する。
 `POST /api/chats/{channel_id}/messages` では、対象チャットの最初のユーザーメッセージ送信時に `channel_name` を会話内容から自動生成した名称へ更新する。
 `POST /api/chats/{channel_id}/messages` では `correction_rules` と `messages.ai_feedback` を学習データとして参照する。
 `POST /api/chats/{channel_id}/messages/{message_id}/feedback` では対象 AI メッセージの `ai_feedback` を更新する。
-`POST /api/chats/{channel_id}/messages/{message_id}/correct` では対象 AI メッセージに対する訂正をもとにルールと埋め込みを `correction_rules` に保存する。
+`POST /api/chats/{channel_id}/messages` では、ユーザーの `message_text` に訂正意図が含まれる場合、対象チャットの全履歴をもとに自己訂正とルール抽出を行い、必要に応じて `correction_rules` に保存する。
 
 ## 5. ORM とベクトル検索
 
