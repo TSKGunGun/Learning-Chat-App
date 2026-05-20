@@ -65,7 +65,7 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - 実装例として SWR 等の利用を想定する
 - バックエンドから返却されたAI回答をチャットUIへ反映する
 
-この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/message` とする。
+この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{chatId}/messages` とする。
 
 ## 7. 訂正送信
 
@@ -75,7 +75,7 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - UIは入力受付と結果表示を担う
 - ルール抽出や保存処理自体はバックエンド側で実行する
 
-この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/correct` とする。
+この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{chatId}/messages/{messageId}/correct` とする。
 
 ## 8. 認証画面の前提
 

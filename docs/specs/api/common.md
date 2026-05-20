@@ -16,8 +16,8 @@ APIは、UIからのリクエストを受け取り、チャット履歴取得、
 - 履歴取得要求を受けてチャットデータを返す
 - 個別チャット取得要求を受けて対象チャットを返す
 - チャット削除要求を受けて対象チャットを削除する
-- メッセージ送信要求を受けて回答生成処理を起動する
-- 訂正送信要求を受けてルール抽出と保存処理を起動する
+- チャット単位のメッセージ送信要求を受けて回答生成処理を起動する
+- 対象メッセージへの訂正要求を受けてルール抽出と保存処理を起動する
 
 採用技術は Node.js、Hono、TypeScript とする。Hono はフレームワーク層として扱い、API はクリーンアーキテクチャにおける入口層とする。
 
@@ -44,8 +44,8 @@ APIエンドポイントの正本は本章とする。
 | `POST` | `/api/chats` | 新規チャットの作成 | クライアントサイド |
 | `GET` | `/api/chats/{chatId}` | 既存チャットの取得 | クライアントサイド |
 | `DELETE` | `/api/chats/{chatId}` | 既存チャットの削除 | クライアントサイド |
-| `POST` | `/api/chats/message` | 新規メッセージの送信（回答生成の起動） | クライアントサイド |
-| `POST` | `/api/chats/correct` | AI回答に対する訂正の送信（ルール抽出・保存処理の起動） | クライアントサイド |
+| `POST` | `/api/chats/{chatId}/messages` | 指定チャットへの新規メッセージ送信（回答生成の起動） | クライアントサイド |
+| `POST` | `/api/chats/{chatId}/messages/{messageId}/correct` | 指定 AI メッセージに対する訂正の送信（ルール抽出・保存処理の起動） | クライアントサイド |
 
 ## 5. リクエストごとの処理責務
 
@@ -86,18 +86,22 @@ APIエンドポイントの正本は本章とする。
 - チャット削除操作から利用される
 - ログイン済みユーザー自身のチャットのみ削除対象とする
 
-### `POST /api/chats/message`
+### `POST /api/chats/{chatId}/messages`
 
-- 新規メッセージを受け取る
+- path parameter として `chatId` を受け取る
+- 指定チャットへの新規メッセージを受け取る
 - 回答生成処理を起動する
+- 追加されたユーザーメッセージと生成された AI メッセージは `messages` として扱う
 - 回答生成では、基盤側で埋め込み生成、類似ルール検索、プロンプト構築、LLM実行を行う
 - ルール検索対象となるデータの詳細は [../db/common.md](../db/common.md) を参照する
 - 実行基盤の詳細は [../infra/common.md](../infra/common.md) を参照する
 
-### `POST /api/chats/correct`
+### `POST /api/chats/{chatId}/messages/{messageId}/correct`
 
-- AI回答に対する訂正内容を受け取る
+- path parameter として `chatId` と `messageId` を受け取る
+- 指定された AI メッセージに対する訂正内容を受け取る
 - 訂正内容をもとにルール抽出とベクトル保存処理を起動する
+- 訂正対象メッセージは AI 出力である前提とする
 - 保存対象となるデータの詳細は [../db/common.md](../db/common.md) を参照する
 - ルール抽出と埋め込み生成の基盤詳細は [../infra/common.md](../infra/common.md) を参照する
 
@@ -112,5 +116,6 @@ APIは以下の前提でUIから利用される。
 - チャット削除は `DELETE /api/chats/{chatId}` を利用する
 - 新規チャット開始および既存チャットを開く操作では、トップ画面上のチャットモーダルを表示する
 - 初期データ読み込みは RSC 経由で行う
-- メッセージ送信と訂正送信は Client Components から行う
+- メッセージ送信は `POST /api/chats/{chatId}/messages` を利用する
+- 訂正送信は `POST /api/chats/{chatId}/messages/{messageId}/correct` を利用する
 - `hono/rpc` を通じてフロントエンドと型共有できる構成を前提とする

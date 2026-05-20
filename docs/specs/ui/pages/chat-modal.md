@@ -41,8 +41,8 @@ UI は LINE のようなチャット画面を前提とし、会話の流れを�
 ## 7. モーダル内でのチャット操作
 
 - モーダル内ではチャット履歴の表示を行う
-- モーダル内からメッセージ送信を行う場合は、`POST /api/chats/message` を利用する前提とする
-- モーダル内から訂正送信を行う場合は、`POST /api/chats/correct` を利用する前提とする
+- モーダル内からメッセージ送信を行う場合は、対象チャットの `chatId` を path parameter に含む `POST /api/chats/{chatId}/messages` を利用する前提とする
+- モーダル内から訂正送信を行う場合は、対象チャットの `chatId` と対象 AI メッセージの `messageId` を path parameter に含む `POST /api/chats/{chatId}/messages/{messageId}/correct` を利用する前提とする
 
 ## 8. 送信可能な内容
 

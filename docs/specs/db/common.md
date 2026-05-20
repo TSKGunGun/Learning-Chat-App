@@ -8,8 +8,9 @@
 
 ## 2. DBの責務
 
-DBは、チャット履歴と訂正から抽出されたルールデータを永続化し、回答生成時の類似ルール検索を支える。
+DBは、チャットチャンネル、チャット履歴、および訂正から抽出されたルールデータを永続化し、回答生成時の類似ルール検索を支える。
 
+- チャットチャンネルの保存
 - チャット履歴の保存
 - 抽出済みルールの保存
 - ルール埋め込みベクトルの保存
@@ -36,20 +37,34 @@ DBは、チャット履歴と訂正から抽出されたルールデータを永
 
 ### `chats` テーブル
 
-セッションややり取りの履歴を保持するマスターデータ。
+チャットチャンネルを保持するマスターデータ。
 
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key): チャット所有者のユーザー ID
-- `user_query` (Text): ユーザーの質問
-- `ai_response` (Text): AIの回答
 - `created_at` (Timestamp)
+- `updated_at` (Timestamp)
+
+`chats` テーブル自体はチャットチャンネルの単位を表し、チャット履歴は `messages` テーブルで管理する。
+
+### `messages` テーブル
+
+チャットチャンネル内のメッセージ履歴を保持する。
+
+- `id` (UUID, Primary Key)
+- `chat_id` (UUID, Foreign Key): 所属するチャットチャンネルの ID
+- `sender_type` (Text): `user` または `ai`
+- `message_text` (Text): メッセージ本文
+- `ai_feedback` (Text, Nullable): AI 出力に対する評価。`good` または `bad` を保持し、ユーザー出力の場合は `null` とする
+- `created_at` (Timestamp)
+
+`messages` テーブルにより、1 つのチャットチャンネルに対して複数のメッセージ履歴を保持する。
 
 ### `correction_rules` テーブル
 
 ベクトル検索用ルールデータを保持する。
 
 - `id` (UUID, Primary Key)
-- `chat_id` (UUID, Foreign Key): 元となったチャットのID
+- `message_id` (UUID, Foreign Key): 元となった AI メッセージの ID
 - `rule_text` (Text): LLMが抽出した「次回以降守るべきルール」
 - `embedding` (vector(1536)): OpenAI APIで生成されたベクトルデータ
 - `created_at` (Timestamp)
@@ -59,19 +74,22 @@ DBは、チャット履歴と訂正から抽出されたルールデータを永
 バックエンドは以下のデータを管理する。
 
 - `users` テーブル: ログイン対象ユーザーの認証情報を保持する
-- `chats` テーブル: セッションややり取りの履歴を保持する
+- `chats` テーブル: チャットチャンネルを保持する
+- `messages` テーブル: チャット履歴を保持する
 - `correction_rules` テーブル: 抽出済みルールと埋め込みベクトルを保持する
 
 `POST /api/auth/login` では `users` を認証対象として参照する。
 `GET /api/chats`、`POST /api/chats`、`GET /api/chats/{chatId}`、`DELETE /api/chats/{chatId}` では `chats` をログイン済みユーザー単位で参照または更新する。
-`POST /api/chats/message` では `correction_rules` を類似ルール検索対象として参照する。
-`POST /api/chats/correct` では抽出されたルールと埋め込みを `correction_rules` に保存する。
+`GET /api/chats/{chatId}` および `POST /api/chats/{chatId}/messages` では `messages` をチャット履歴として参照または追加する。
+`POST /api/chats/{chatId}/messages` では `correction_rules` を類似ルール検索対象として参照する。
+`POST /api/chats/{chatId}/messages/{messageId}/correct` では対象 AI メッセージに対する訂正をもとにルールと埋め込みを `correction_rules` に保存する。
 
 ## 5. ORM とベクトル検索
 
 Drizzle ORM はスキーマ定義とデータアクセスを担う。
 PostgreSQL + `pgvector` は、ルールデータの永続化とベクトル類似度検索を担う。
 
+- Drizzle ORM を用いて `messages` テーブルへチャット履歴を保存する
 - Drizzle ORM を用いて `correction_rules` テーブルへ保存する
 - Drizzle ORM を用いて `CorrectionRule` の類似度検索を実行する
 - `embedding` は OpenAI API により生成された 1536 次元ベクトルを保持する
