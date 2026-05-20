@@ -20,6 +20,7 @@ UIは、ユーザー向け画面の提供と、初期表示およびユーザー
 - CSS は Tailwind CSS を利用する
 - UI コンポーネントは `shadcn/ui` を利用する
 - アイコンは `lucide-react` を利用する
+- HTTP 通信では `axios` は使用せず、Next.js 標準の `fetch` を利用する
 
 - Server Components と Client Components は、表示責務とエントリーポイント責務に集中する
 - 画面層は業務ロジックを直接持たず、調停層と Use Case を経由して処理する
@@ -31,6 +32,7 @@ UIは、ユーザー向け画面の提供と、初期表示およびユーザー
 | --- | --- | --- |
 | トップ画面 | `/` | [top.md](./pages/top.md) |
 | ログイン画面 | `/login` | [login.md](./pages/login.md) |
+| チャットモーダル | `/` 上のモーダル | [chat-modal.md](./pages/chat-modal.md) |
 
 ## 4. 初期データ読み込み
 

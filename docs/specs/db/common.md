@@ -39,6 +39,7 @@ DBは、チャット履歴と訂正から抽出されたルールデータを永
 セッションややり取りの履歴を保持するマスターデータ。
 
 - `id` (UUID, Primary Key)
+- `user_id` (UUID, Foreign Key): チャット所有者のユーザー ID
 - `user_query` (Text): ユーザーの質問
 - `ai_response` (Text): AIの回答
 - `created_at` (Timestamp)
@@ -62,6 +63,7 @@ DBは、チャット履歴と訂正から抽出されたルールデータを永
 - `correction_rules` テーブル: 抽出済みルールと埋め込みベクトルを保持する
 
 `POST /api/auth/login` では `users` を認証対象として参照する。
+`GET /api/chats`、`POST /api/chats`、`GET /api/chats/{chatId}`、`DELETE /api/chats/{chatId}` では `chats` をログイン済みユーザー単位で参照または更新する。
 `POST /api/chats/message` では `correction_rules` を類似ルール検索対象として参照する。
 `POST /api/chats/correct` では抽出されたルールと埋め込みを `correction_rules` に保存する。
 
