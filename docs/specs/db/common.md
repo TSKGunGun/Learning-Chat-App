@@ -36,24 +36,24 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 パスワード平文は保持せず、保存対象はハッシュ値のみとする。
 ユーザー作成フローは今回の仕様範囲外とし、ユーザーは事前作成済みである前提とする。
 
-### `chats` テーブル
+### `chat_channels` テーブル
 
-チャットチャンネルを保持するマスターデータ。
+`ChatChannel` モデルを保持するマスターデータ。
 
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key): チャット所有者のユーザー ID
-- `room_name` (Text): チャットルーム名。新規作成時は `新規チャット` を保持し、最初のユーザーメッセージ送信時に会話内容から自動生成した名称へ更新する
+- `channel_name` (Text): チャンネル名。新規作成時は `新規チャット` を保持し、最初のユーザーメッセージ送信時に会話内容から自動生成した名称へ更新する
 - `created_at` (Timestamp)
 - `updated_at` (Timestamp)
 
-`chats` テーブル自体はチャットチャンネルの単位を表し、チャット履歴は `messages` テーブルで管理する。
+`chat_channels` テーブル自体はチャットチャンネルの単位を表し、チャット履歴は `messages` テーブルで管理する。
 
 ### `messages` テーブル
 
 チャットチャンネル内のメッセージ履歴を保持する。
 
 - `id` (UUID, Primary Key)
-- `chat_id` (UUID, Foreign Key): 所属するチャットチャンネルの ID
+- `channel_id` (UUID, Foreign Key): 所属するチャットチャンネルの ID
 - `sender_type` (Text): `user` または `ai`
 - `message_text` (Text): メッセージ本文
 - `ai_feedback` (Text, Nullable): AI 出力に対する評価。`good` または `bad` を保持し、ユーザー出力の場合は `null` とする
@@ -78,18 +78,18 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 バックエンドは以下のデータを管理する。
 
 - `users` テーブル: ログイン対象ユーザーの認証情報を保持する
-- `chats` テーブル: チャットチャンネルを保持する
+- `chat_channels` テーブル: チャットチャンネルを保持する
 - `messages` テーブル: チャット履歴を保持する
 - `correction_rules` テーブル: 抽出済みルールと埋め込みベクトルを保持する
 
 `POST /api/auth/login` では `users` を認証対象として参照する。
-`GET /api/chats`、`POST /api/chats`、`GET /api/chats/{chatId}`、`DELETE /api/chats/{chatId}` では `chats` をログイン済みユーザー単位で参照または更新する。
-`POST /api/chats` では `room_name` が `新規チャット` のチャットチャンネルを作成する。
-`GET /api/chats/{chatId}` および `POST /api/chats/{chatId}/messages` では `messages` をチャット履歴として参照または追加する。
-`POST /api/chats/{chatId}/messages` では、対象チャットの最初のユーザーメッセージ送信時に `room_name` を会話内容から自動生成した名称へ更新する。
-`POST /api/chats/{chatId}/messages` では `correction_rules` と `messages.ai_feedback` を学習データとして参照する。
-`POST /api/chats/{chatId}/messages/{messageId}/feedback` では対象 AI メッセージの `ai_feedback` を更新する。
-`POST /api/chats/{chatId}/messages/{messageId}/correct` では対象 AI メッセージに対する訂正をもとにルールと埋め込みを `correction_rules` に保存する。
+`GET /api/chats`、`POST /api/chats`、`GET /api/chats/{channel_id}`、`DELETE /api/chats/{channel_id}` では `chat_channels` をログイン済みユーザー単位で参照または更新する。
+`POST /api/chats` では `channel_name` が `新規チャット` のチャットチャンネルを作成する。
+`GET /api/chats/{channel_id}` および `POST /api/chats/{channel_id}/messages` では `messages` をチャット履歴として参照または追加する。
+`POST /api/chats/{channel_id}/messages` では、対象チャットの最初のユーザーメッセージ送信時に `channel_name` を会話内容から自動生成した名称へ更新する。
+`POST /api/chats/{channel_id}/messages` では `correction_rules` と `messages.ai_feedback` を学習データとして参照する。
+`POST /api/chats/{channel_id}/messages/{messageId}/feedback` では対象 AI メッセージの `ai_feedback` を更新する。
+`POST /api/chats/{channel_id}/messages/{messageId}/correct` では対象 AI メッセージに対する訂正をもとにルールと埋め込みを `correction_rules` に保存する。
 
 ## 5. ORM とベクトル検索
 

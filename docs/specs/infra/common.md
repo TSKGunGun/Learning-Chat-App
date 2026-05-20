@@ -29,7 +29,7 @@
 バックエンドは Hono を用いた API サーバーとして実行する。
 
 - API サーバーは Node.js 実行環境上で動作する
-- UI からの `POST /api/auth/login`、`GET /api/chats`、`POST /api/chats`、`GET /api/chats/{chatId}`、`DELETE /api/chats/{chatId}`、`POST /api/chats/{chatId}/messages`、`POST /api/chats/{chatId}/messages/{messageId}/feedback`、`POST /api/chats/{chatId}/messages/{messageId}/correct` を受け付ける
+- UI からの `POST /api/auth/login`、`GET /api/chats`、`POST /api/chats`、`GET /api/chats/{channel_id}`、`DELETE /api/chats/{channel_id}`、`POST /api/chats/{channel_id}/messages`、`POST /api/chats/{channel_id}/messages/{messageId}/feedback`、`POST /api/chats/{channel_id}/messages/{messageId}/correct` を受け付ける
 - API サーバーはデータベース、OpenAI API、LangChain.js と連携して応答生成と自己学習処理を実行する
 - API エンドポイントの正本は [../api/common.md](../api/common.md) を参照する
 
