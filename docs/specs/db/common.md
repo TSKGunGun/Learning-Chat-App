@@ -8,10 +8,11 @@
 
 ## 2. DBの責務
 
-DBは、チャットチャンネル、チャット履歴、および訂正から抽出されたルールデータを永続化し、回答生成時の類似ルール検索を支える。
+DBは、チャットチャンネル、チャット履歴、メッセージ評価、および訂正から抽出されたルールデータを永続化し、回答生成時の類似ルール検索とフィードバック学習を支える。
 
 - チャットチャンネルの保存
 - チャット履歴の保存
+- AI メッセージに対するフィードバック評価の保存
 - 抽出済みルールの保存
 - ルール埋め込みベクトルの保存
 - ベクトル類似度検索の実行基盤提供
@@ -41,6 +42,7 @@ DBは、チャットチャンネル、チャット履歴、および訂正から
 
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key): チャット所有者のユーザー ID
+- `room_name` (Text): チャットルーム名。新規作成時は `新規チャット` を保持し、最初のユーザーメッセージ送信時に会話内容から自動生成した名称へ更新する
 - `created_at` (Timestamp)
 - `updated_at` (Timestamp)
 
@@ -55,9 +57,11 @@ DBは、チャットチャンネル、チャット履歴、および訂正から
 - `sender_type` (Text): `user` または `ai`
 - `message_text` (Text): メッセージ本文
 - `ai_feedback` (Text, Nullable): AI 出力に対する評価。`good` または `bad` を保持し、ユーザー出力の場合は `null` とする
+- `feedback_updated_at` (Timestamp, Nullable): AI メッセージに対するフィードバックの最終更新日時。ユーザー出力の場合は `null` とする
 - `created_at` (Timestamp)
 
 `messages` テーブルにより、1 つのチャットチャンネルに対して複数のメッセージ履歴を保持する。
+`ai_feedback` は AI メッセージに対する Good / Bad 評価を保持し、以後の回答生成時に学習シグナルとして参照する。
 
 ### `correction_rules` テーブル
 
@@ -80,8 +84,11 @@ DBは、チャットチャンネル、チャット履歴、および訂正から
 
 `POST /api/auth/login` では `users` を認証対象として参照する。
 `GET /api/chats`、`POST /api/chats`、`GET /api/chats/{chatId}`、`DELETE /api/chats/{chatId}` では `chats` をログイン済みユーザー単位で参照または更新する。
+`POST /api/chats` では `room_name` が `新規チャット` のチャットチャンネルを作成する。
 `GET /api/chats/{chatId}` および `POST /api/chats/{chatId}/messages` では `messages` をチャット履歴として参照または追加する。
-`POST /api/chats/{chatId}/messages` では `correction_rules` を類似ルール検索対象として参照する。
+`POST /api/chats/{chatId}/messages` では、対象チャットの最初のユーザーメッセージ送信時に `room_name` を会話内容から自動生成した名称へ更新する。
+`POST /api/chats/{chatId}/messages` では `correction_rules` と `messages.ai_feedback` を学習データとして参照する。
+`POST /api/chats/{chatId}/messages/{messageId}/feedback` では対象 AI メッセージの `ai_feedback` を更新する。
 `POST /api/chats/{chatId}/messages/{messageId}/correct` では対象 AI メッセージに対する訂正をもとにルールと埋め込みを `correction_rules` に保存する。
 
 ## 5. ORM とベクトル検索
@@ -90,6 +97,7 @@ Drizzle ORM はスキーマ定義とデータアクセスを担う。
 PostgreSQL + `pgvector` は、ルールデータの永続化とベクトル類似度検索を担う。
 
 - Drizzle ORM を用いて `messages` テーブルへチャット履歴を保存する
+- Drizzle ORM を用いて `messages.ai_feedback` を更新する
 - Drizzle ORM を用いて `correction_rules` テーブルへ保存する
 - Drizzle ORM を用いて `CorrectionRule` の類似度検索を実行する
 - `embedding` は OpenAI API により生成された 1536 次元ベクトルを保持する

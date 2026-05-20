@@ -37,11 +37,14 @@ UI は LINE のようなチャット画面を前提とし、会話の流れを�
 - ユーザーのメッセージと AI のメッセージは視覚的に区別できるように表示する
 - 会話の新しいメッセージが下に積み上がる、LINE ライクな UI を前提とする
 - モーダル下部にメッセージ入力欄と送信操作を配置する
+- AI メッセージごとに Good ボタンと Bad ボタンを配置できるようにする
+- Good ボタンと Bad ボタンは、各 AI メッセージの UI 要素の直下に配置する
 
 ## 7. モーダル内でのチャット操作
 
 - モーダル内ではチャット履歴の表示を行う
 - モーダル内からメッセージ送信を行う場合は、対象チャットの `chatId` を path parameter に含む `POST /api/chats/{chatId}/messages` を利用する前提とする
+- モーダル内から AI メッセージへのフィードバック送信を行う場合は、対象チャットの `chatId` と対象 AI メッセージの `messageId` を path parameter に含む `POST /api/chats/{chatId}/messages/{messageId}/feedback` を利用する前提とする
 - モーダル内から訂正送信を行う場合は、対象チャットの `chatId` と対象 AI メッセージの `messageId` を path parameter に含む `POST /api/chats/{chatId}/messages/{messageId}/correct` を利用する前提とする
 
 ## 8. 送信可能な内容
