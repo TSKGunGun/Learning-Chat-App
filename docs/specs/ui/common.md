@@ -64,11 +64,14 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 
 - 通信はクライアントサイドで行う
 - 実装例として SWR 等の利用を想定する
+- 新規チャットでは最初のメッセージ送信時に `POST /api/chats` を利用し、保存済みチャットでは `POST /api/chats/{channel_id}/messages` を利用する
 - バックエンドから返却されたユーザーメッセージをチャット UI へ反映する
+- メッセージ送信直後は、ChatGPT の Web アプリに近い体験として、一時的な AI 応答中ダミーメッセージをチャット UI に表示する
 - メッセージ送信後は対象チャットの履歴を再取得し、バックエンド内で生成・更新された AI 応答を反映する
+- ダミーメッセージは、実際の AI メッセージが履歴取得で確認できた時点で置き換える
 - メッセージ送信後は `last_messaged_at` と `channel_name` の更新に追従するため、チャット一覧データをリフレッシュする
 
-この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{channel_id}/messages` とする。
+この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats` および `POST /api/chats/{channel_id}/messages` とする。
 
 ## 7. 訂正送信
 
@@ -78,7 +81,7 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - UI は入力受付と結果表示を担う
 - バックエンドは `message_text` の意図を判定し、対象チャットの全履歴をもとに必要に応じて自己訂正とルール抽出を実行する
 
-この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{channel_id}/messages` とする。
+この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats` および `POST /api/chats/{channel_id}/messages` とする。
 
 ## 8. フィードバック送信
 
@@ -86,7 +89,10 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 
 - フィードバック操作はクライアントサイドからバックエンド API へ送信する
 - UI は AI メッセージごとに Good ボタンと Bad ボタンを表示できるようにする
-- フィードバック送信時は `feedback` を boolean で送り、`true` を Good、`false` を Bad として扱う
+- フィードバック送信時は `ai_feedback` を `true`、`false`、`null` のいずれかで送る
+- `true` は Good、`false` は Bad、`null` は取り消しとして扱う
+- 既に Good 済みのメッセージへ再度 Good を送信した場合、および既に Bad 済みのメッセージへ再度 Bad を送信した場合は、取り消し操作として `ai_feedback = null` を送信する
+- 既存の評価と反対側のフィードバックを送信した場合は、その値へ更新する
 - 保存されたフィードバックは、以後の回答生成に利用される前提とする
 
 この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{channel_id}/messages/{message_id}/feedback` とする。
@@ -117,6 +123,7 @@ UIは以下の前提に依存する。
 - Hono ベースのAPIが利用可能であること
 - `hono/rpc` を通じて型安全にインターフェース共有できること
 - チャット回答生成はバックエンド側でRAGを実行した結果として返却されること
+- AI 応答生成中は UI 側でダミーメッセージを表示し、履歴再取得で実メッセージへ置き換えること
 - AI メッセージへの Good / Bad フィードバックがバックエンド側で学習データとして保存・参照されること
 - 訂正送信後の自己学習処理はバックエンド側の責務であること
 
