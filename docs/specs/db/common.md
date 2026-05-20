@@ -21,6 +21,19 @@ DBは、チャット履歴と訂正から抽出されたルールデータを永
 
 データモデルの正本は本章とする。
 
+### `users` テーブル
+
+ログイン対象となるユーザー情報を保持する。
+
+- `id` (UUID, Primary Key)
+- `username` (Text, Unique): ログイン時に使用するユーザー名
+- `password_hash` (Text): ハッシュ化されたパスワード
+- `created_at` (Timestamp)
+- `updated_at` (Timestamp)
+
+パスワード平文は保持せず、保存対象はハッシュ値のみとする。
+ユーザー作成フローは今回の仕様範囲外とし、ユーザーは事前作成済みである前提とする。
+
 ### `chats` テーブル
 
 セッションややり取りの履歴を保持するマスターデータ。
@@ -44,9 +57,11 @@ DBは、チャット履歴と訂正から抽出されたルールデータを永
 
 バックエンドは以下のデータを管理する。
 
+- `users` テーブル: ログイン対象ユーザーの認証情報を保持する
 - `chats` テーブル: セッションややり取りの履歴を保持する
 - `correction_rules` テーブル: 抽出済みルールと埋め込みベクトルを保持する
 
+`POST /api/auth/login` では `users` を認証対象として参照する。
 `POST /api/chats/message` では `correction_rules` を類似ルール検索対象として参照する。
 `POST /api/chats/correct` では抽出されたルールと埋め込みを `correction_rules` に保存する。
 
