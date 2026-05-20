@@ -17,6 +17,10 @@ UIは、ユーザー向け画面の提供と、初期表示およびユーザー
 
 採用技術は Next.js (App Router) と TypeScript とし、React Server Components と Client Components を役割に応じて使い分ける。Next.js は UI のフレームワーク層として扱い、アプリケーションの中心に置かない。
 
+- CSS は Tailwind CSS を利用する
+- UI コンポーネントは `shadcn/ui` を利用する
+- アイコンは `lucide-react` を利用する
+
 - Server Components と Client Components は、表示責務とエントリーポイント責務に集中する
 - 画面層は業務ロジックを直接持たず、調停層と Use Case を経由して処理する
 - 内部 DTO や永続化都合のデータは、そのまま表示層へ渡さない
