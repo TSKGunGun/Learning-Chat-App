@@ -1,11 +1,16 @@
-import { Link } from "react-router-dom";
+import { Button } from "@/presentation/atoms/button";
+import { RouteErrorState } from "@/presentation/organisms/route-error-state";
+import { WorkspacePageTemplate } from "@/presentation/templates/workspace-page-template";
 
-import { Button } from "@/components/atoms/button";
-import { RouteErrorState } from "@/components/organisms/route-error-state";
-import { WorkspacePageTemplate } from "@/components/templates/workspace-page-template";
-import { ROUTES } from "@/shared/constants/routes";
+interface NotFoundPageProps {
+  readonly primaryActionHref: string;
+  readonly primaryActionLabel: string;
+}
 
-export function NotFoundPage() {
+export function NotFoundPage({
+  primaryActionHref,
+  primaryActionLabel,
+}: NotFoundPageProps) {
   return (
     <WorkspacePageTemplate
       title="ページが見つかりません"
@@ -18,7 +23,7 @@ export function NotFoundPage() {
         />
         <div>
           <Button asChild>
-            <Link to={ROUTES.top}>トップ画面へ戻る</Link>
+            <a href={primaryActionHref}>{primaryActionLabel}</a>
           </Button>
         </div>
       </div>

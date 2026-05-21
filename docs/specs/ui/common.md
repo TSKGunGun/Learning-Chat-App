@@ -52,28 +52,33 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 
 - フレームワーク層: `framework` 相当。Vite 配下のルーティング、起動処理、画面エントリーポイントを置く
 - `interface-adapters`: Controller、Presenter、入力変換、画面向け ViewModel 変換を担う
+- `interface-adapters/view-models`: Presenter が整形した画面向け ViewModel を置く
 - `application`: Use Case、アプリケーション境界の型、Repository や Service の抽象を置く
 - `entities`: Entity、Value Object、変わりにくい業務ルールを置く
 - `infrastructure`: DB や外部 API など外部依存の実装を置く
 - `di`: 依存解決とバインド設定を置く
+- `shared`: 純粋 util や framework 非依存の汎用物だけを置く
 
 依存方向は外側から内側への一方向とし、フレームワーク層から DB 実装や SDK 実装を直接参照しない。
 
 Atomic Design の適用対象は UI 層のみに限定し、`application`、`entities`、`infrastructure`、`di` は既存のクリーンアーキテクチャの責務分離を優先する。
 
-UI / presentation 層のコンポーネントは、役割ごとにディレクトリを分けて保存する。
+UI / presentation 層のコンポーネントは `presentation` ディレクトリ配下で、役割ごとにディレクトリを分けて保存する。
 
-- `atoms`: 最小単位の UI 部品を置く。`shadcn/ui` のベースコンポーネントもここへ統合する
-- `molecules`: 複数の `atoms` を組み合わせた小さな UI を置く
-- `organisms`: 機能的なまとまりを持つ UI ブロックを置く
-- `templates`: 画面レイアウトの骨組みを置く
-- `pages`: 画面仕様に対応するページ単位の UI 構成を置く
+- `presentation/atoms`: 最小単位の UI 部品を置く。`shadcn/ui` のベースコンポーネントもここへ統合する
+- `presentation/molecules`: 複数の `presentation/atoms` を組み合わせた小さな UI を置く
+- `presentation/organisms`: 機能的なまとまりを持つ UI ブロックを置く
+- `presentation/templates`: 画面レイアウトの骨組みを置く
+- `presentation/pages`: 画面仕様に対応するページ単位の UI 構成と state UI を置く
 
 コンポーネント配置では次のルールを守る。
 
 - 業務ロジックを `atoms`、`molecules`、`organisms` に直接持ち込まない
 - 画面固有のデータ取得や API 呼び出しは UI コンポーネントに閉じず、既存のレイヤー境界を守る
 - 再利用粒度に応じて適切な Atomic レイヤーへ配置する
+- `presentation/pages` は router API を直接参照せず、必要な navigation 情報は `framework` から受け取る
+- route 定数や route 専用 hook は `framework` に置き、`shared` に routing 関心を持ち込まない
+- 画面向け ViewModel は `interface-adapters/view-models` に置き、`shared` に表示専用型を持ち込まない
 
 ## 6. メッセージ送信
 

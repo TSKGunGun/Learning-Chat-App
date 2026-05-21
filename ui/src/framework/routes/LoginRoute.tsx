@@ -1,11 +1,12 @@
 import { useCallback } from "react";
 
-import { RouteLoadingState } from "@/components/organisms/route-loading-state";
-import { RouteErrorState } from "@/components/organisms/route-error-state";
-import { LoginPage } from "@/components/pages/login/login-page";
-import { AuthPageTemplate } from "@/components/templates/auth-page-template";
 import { container } from "@/di/container";
 import { useRouteLoader } from "@/framework/hooks/use-route-loader";
+import {
+  LoginErrorPage,
+  LoginLoadingPage,
+  LoginPage,
+} from "@/presentation/pages/login/login-page";
 
 export function LoginRoute() {
   const loadLoginPage = useCallback(
@@ -18,25 +19,11 @@ export function LoginRoute() {
   );
 
   if (hasError) {
-    return (
-      <AuthPageTemplate eyebrow="Login Route Error">
-        <RouteErrorState
-          title="ログイン画面の初期化に失敗しました"
-          description="認証プレースホルダーの ViewModel を組み立てられなかったため、安全なエラー表示へ切り替えています。"
-        />
-      </AuthPageTemplate>
-    );
+    return <LoginErrorPage />;
   }
 
   if (isLoading || viewModel === null) {
-    return (
-      <AuthPageTemplate eyebrow="Login Route Loading">
-        <RouteLoadingState
-          title="ログイン画面のプレースホルダーを準備しています"
-          description="非同期ロード前提でも route から UI 層へ安全に値を渡せる形を整えています。"
-        />
-      </AuthPageTemplate>
-    );
+    return <LoginLoadingPage />;
   }
 
   return <LoginPage viewModel={viewModel} />;

@@ -1,6 +1,6 @@
 import type { LoadLoginPagePreviewUseCase } from "@/application/use-cases/load-login-page-preview-use-case";
 import type { LoginPagePresenter } from "@/interface-adapters/presenters/login-page-presenter";
-import type { LoginPageViewModel } from "@/shared/types/view-models";
+import type { LoginPageViewModel } from "@/interface-adapters/view-models/view-models";
 
 export class LoginPageController {
   public constructor(

@@ -1,9 +1,9 @@
 import { Menu, PenSquare, ThumbsDown, ThumbsUp } from "lucide-react";
 
-import { Button } from "@/components/atoms/button";
-import { Card } from "@/components/atoms/card";
-import { SidebarChannelItem } from "@/components/molecules/sidebar-channel-item";
-import type { TopPageViewModel } from "@/shared/types/view-models";
+import { Button } from "@/presentation/atoms/button";
+import { Card } from "@/presentation/atoms/card";
+import { SidebarChannelItem } from "@/presentation/molecules/sidebar-channel-item";
+import type { TopPageViewModel } from "@/interface-adapters/view-models/view-models";
 
 interface ChatWorkspacePreviewProps {
   readonly viewModel: TopPageViewModel;

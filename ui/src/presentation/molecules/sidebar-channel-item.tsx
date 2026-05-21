@@ -1,8 +1,8 @@
 import { MessageSquare } from "lucide-react";
 
-import { Card } from "@/components/atoms/card";
+import { Card } from "@/presentation/atoms/card";
 import { cn } from "@/shared/lib/utils";
-import type { ChatChannelListItemViewModel } from "@/shared/types/view-models";
+import type { ChatChannelListItemViewModel } from "@/interface-adapters/view-models/view-models";
 
 interface SidebarChannelItemProps {
   readonly channel: ChatChannelListItemViewModel;

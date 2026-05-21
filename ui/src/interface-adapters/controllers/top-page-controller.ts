@@ -1,6 +1,6 @@
 import type { LoadTopPagePreviewUseCase } from "@/application/use-cases/load-top-page-preview-use-case";
 import type { TopPagePresenter } from "@/interface-adapters/presenters/top-page-presenter";
-import type { TopPageViewModel } from "@/shared/types/view-models";
+import type { TopPageViewModel } from "@/interface-adapters/view-models/view-models";
 
 export class TopPageController {
   public constructor(

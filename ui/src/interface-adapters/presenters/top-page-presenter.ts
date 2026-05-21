@@ -1,6 +1,6 @@
 import type { TopPagePreview } from "@/application/ports/ui-workspace-content-repository";
 import type { MessageStatus } from "@/entities/chat/chat-message";
-import type { TopPageViewModel } from "@/shared/types/view-models";
+import type { TopPageViewModel } from "@/interface-adapters/view-models/view-models";
 
 const formatStatusLabel = (status: MessageStatus) => {
   switch (status) {

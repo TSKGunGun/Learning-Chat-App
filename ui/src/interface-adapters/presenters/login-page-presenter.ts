@@ -1,5 +1,5 @@
 import type { LoginPagePreview } from "@/application/ports/ui-workspace-content-repository";
-import type { LoginPageViewModel } from "@/shared/types/view-models";
+import type { LoginPageViewModel } from "@/interface-adapters/view-models/view-models";
 
 export class LoginPagePresenter {
   public present(preview: LoginPagePreview): LoginPageViewModel {

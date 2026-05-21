@@ -1,11 +1,11 @@
 import type { FormEvent } from "react";
 import { ShieldCheck } from "lucide-react";
 
-import { Button } from "@/components/atoms/button";
-import { Card } from "@/components/atoms/card";
-import { Input } from "@/components/atoms/input";
-import { FormField } from "@/components/molecules/form-field";
-import type { LoginPageViewModel } from "@/shared/types/view-models";
+import { Button } from "@/presentation/atoms/button";
+import { Card } from "@/presentation/atoms/card";
+import { Input } from "@/presentation/atoms/input";
+import { FormField } from "@/presentation/molecules/form-field";
+import type { LoginPageViewModel } from "@/interface-adapters/view-models/view-models";
 
 interface LoginFormPanelProps {
   readonly viewModel: LoginPageViewModel;
