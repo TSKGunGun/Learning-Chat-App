@@ -14,9 +14,8 @@ LLM自体のパラメータ更新は行わず、LangChain.js を用いた自己�
 
 ```text
 monorepo/
-├── apps/
-│   ├── ui/  (Next.js)
-│   └── api/ (Node.js + Hono)
+├── ui/  (Vite + React)
+├── api/ (Node.js + Hono)
 └── docker-compose.yml (PostgreSQL)
 ```
 
@@ -24,7 +23,7 @@ monorepo/
 
 | コンポーネント | 技術・ツール | 選定理由・役割 |
 | --- | --- | --- |
-| フロントエンド | Next.js (App Router), TypeScript | ユーザー向けUI。RSCとClient Componentsのハイブリッド構成。 |
+| フロントエンド | Vite, React, TypeScript | ユーザー向けUI。SPA 構成で画面と API クライアントを担当する。 |
 | バックエンドAPI | Node.js, Hono, TypeScript | 高速かつ型安全なAPIサーバー。`hono/rpc`でフロントと型を共有。 |
 | LLMオーケストレーション | LangChain.js | プロンプト構築、複数LLMチェーンの制御（ルール抽出・RAG実行）。 |
 | AIモデル | OpenAI API (`gpt-4o`, `text-embedding-3-small`) | テキスト生成（チャット回答、ルール要約）およびベクトル化。 |
@@ -36,7 +35,7 @@ monorepo/
 UI およびバックエンドは、クリーンアーキテクチャを採用する。
 
 - 依存方向は外側から内側への一方向とする
-- UI では Next.js、バックエンドでは Hono をフレームワーク層として扱う
+- UI では Vite + React、バックエンドでは Hono をフレームワーク層として扱う
 - フレームワーク、ORM、SDK の詳細を Use Case や Entity へ直接持ち込まない
 - 画面や API の入口は Controller 相当の調停層を経由し、Use Case と外部依存を分離する
 - 外部依存は Infrastructure 層で吸収し、Use Case は抽象に依存する
@@ -48,7 +47,7 @@ UI 側の詳細設計原則は [UI仕様（共通）](./specs/ui/common.md)、�
 本システムでは、UI が初期表示とユーザー操作を担当し、API がリクエスト受付を担い、DB と基盤層がRAGと自己学習パイプラインを支える。
 
 1. ユーザーがトップ画面 `/` にアクセスし、チャット一覧またはチャット開始操作を行う。
-2. UI は RSC 経由で `GET /api/chats` を呼び出し、チャット一覧を取得する。
+2. UI は `GET /api/chats` を呼び出し、チャット一覧を取得する。
 3. トップ画面は、左側サイドバーにチャット一覧、右側にチャット画面を表示する 2 ペイン構成とする。新規チャット開始または既存チャット選択時は、対象状態を右ペインへ表示する。既存チャット表示時に `status = pending` の AI メッセージが存在する場合、UI はその時点で履歴ポーリングを開始する。
 4. 新規チャットでは、右ペインを未保存の新規チャット状態へ切り替え、最初のユーザーメッセージ送信時に `POST /api/chats` を通じて `chat_channels` と最初のメッセージ履歴を生成する。既存チャットでは `POST /api/chats/{channel_id}/messages` を利用する。
 5. ユーザーの送信メッセージは送信直後に UI へ反映される。AI の応答生成が始まると、`sender_type = ai` かつ `status = pending` のメッセージが履歴に追加される。
@@ -59,7 +58,7 @@ UI 側の詳細設計原則は [UI仕様（共通）](./specs/ui/common.md)、�
 ## 6. 仕様一覧
 
 - [UI仕様（共通）](./specs/ui/common.md)
-  - 画面初期表示、クライアント通信、UIの責務とAPI依存を扱う。
+  - 画面初期表示、クライアント通信、UI の責務と API 依存を扱う。
 - [API仕様（共通）](./specs/api/common.md)
   - Hono API の責務、レイヤー責務、サーバー側の処理責務を扱う。
 - [OpenAPI定義](./specs/api/openapi/openapi.yaml)
