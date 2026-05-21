@@ -15,8 +15,8 @@ LLM自体のパラメータ更新は行わず、LangChain.js を用いた自己�
 ```text
 monorepo/
 ├── apps/
-│   ├── front/ (Next.js)
-│   └── back/  (Node.js + Hono)
+│   ├── ui/  (Next.js)
+│   └── api/ (Node.js + Hono)
 └── docker-compose.yml (PostgreSQL)
 ```
 
