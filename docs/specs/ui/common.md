@@ -19,7 +19,8 @@ UIは、ユーザー向け画面の提供と、初期表示およびユーザー
 採用技術は Next.js (App Router) と TypeScript とし、React Server Components と Client Components を役割に応じて使い分ける。Next.js は UI のフレームワーク層として扱い、アプリケーションの中心に置かない。
 
 - CSS は Tailwind CSS を利用する
-- UI コンポーネントは `shadcn/ui` を利用する
+- UI コンポーネントは Atomic Design を用いて管理する
+- `shadcn/ui` は `atoms` として扱い、Atomic Design の構成へ統合する
 - アイコンは `lucide-react` を利用する
 - HTTP 通信では `axios` は使用せず、Next.js 標準の `fetch` を利用する
 
@@ -58,6 +59,22 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - `di`: 依存解決とバインド設定を置く
 
 依存方向は外側から内側への一方向とし、フレームワーク層から DB 実装や SDK 実装を直接参照しない。
+
+Atomic Design の適用対象は UI 層のみに限定し、`application`、`entities`、`infrastructure`、`di` は既存のクリーンアーキテクチャの責務分離を優先する。
+
+UI / presentation 層のコンポーネントは、役割ごとにディレクトリを分けて保存する。
+
+- `atoms`: 最小単位の UI 部品を置く。`shadcn/ui` のベースコンポーネントもここへ統合する
+- `molecules`: 複数の `atoms` を組み合わせた小さな UI を置く
+- `organisms`: 機能的なまとまりを持つ UI ブロックを置く
+- `templates`: 画面レイアウトの骨組みを置く
+- `pages`: 画面仕様に対応するページ単位の UI 構成を置く
+
+コンポーネント配置では次のルールを守る。
+
+- 業務ロジックを `atoms`、`molecules`、`organisms` に直接持ち込まない
+- 画面固有のデータ取得や API 呼び出しは UI コンポーネントに閉じず、既存のレイヤー境界を守る
+- 再利用粒度に応じて適切な Atomic レイヤーへ配置する
 
 ## 6. メッセージ送信
 

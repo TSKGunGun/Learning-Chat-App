@@ -41,7 +41,7 @@ UI およびバックエンドは、クリーンアーキテクチャを採用�
 - 画面や API の入口は Controller 相当の調停層を経由し、Use Case と外部依存を分離する
 - 外部依存は Infrastructure 層で吸収し、Use Case は抽象に依存する
 
-UI 側の詳細設計原則は [UI仕様（共通）](./specs/ui/common.md)、バックエンド側の詳細設計原則は [API仕様（共通）](./specs/api/common.md) を参照する。HTTP 契約の正本は [OpenAPI定義](./specs/api/openapi/openapi.yaml) を参照する。
+UI 側の詳細設計原則は [UI仕様（共通）](./specs/ui/common.md)、バックエンド側の詳細設計原則は [API仕様（共通）](./specs/api/common.md) を参照する。UI コンポーネントの Atomic Design とディレクトリ構成ルールの正本も [UI仕様（共通）](./specs/ui/common.md) とする。HTTP 契約の正本は [OpenAPI定義](./specs/api/openapi/openapi.yaml) を参照する。
 
 ## 5. 全体処理フロー
 
