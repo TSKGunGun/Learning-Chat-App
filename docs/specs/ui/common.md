@@ -16,15 +16,15 @@ UIは、ユーザー向け画面の提供と、初期表示およびユーザー
 - 訂正送信操作の受付
 - バックエンドから返却された結果の表示
 
-採用技術は Next.js (App Router) と TypeScript とし、React Server Components と Client Components を役割に応じて使い分ける。Next.js は UI のフレームワーク層として扱い、アプリケーションの中心に置かない。
+採用技術は Vite、React、TypeScript とし、Vite は UI のフレームワーク層として扱い、アプリケーションの中心に置かない。
 
 - CSS は Tailwind CSS を利用する
 - UI コンポーネントは Atomic Design を用いて管理する
 - `shadcn/ui` は `atoms` として扱い、Atomic Design の構成へ統合する
 - アイコンは `lucide-react` を利用する
-- HTTP 通信では `axios` は使用せず、Next.js 標準の `fetch` を利用する
+- HTTP 通信では `axios` は使用せず、標準の `fetch` を利用する
 
-- Server Components と Client Components は、表示責務とエントリーポイント責務に集中する
+- React コンポーネントは、表示責務とエントリーポイント責務に集中する
 - 画面層は業務ロジックを直接持たず、調停層と Use Case を経由して処理する
 - 内部 DTO や永続化都合のデータは、そのまま表示層へ渡さない
 
@@ -37,13 +37,12 @@ UIは、ユーザー向け画面の提供と、初期表示およびユーザー
 
 ## 4. 初期データ読み込み
 
-ユーザーがトップ画面 `/` にアクセスした際、Next.js の React Server Components (RSC) を使用してバックエンド API を呼び出す。
+ユーザーがトップ画面 `/` にアクセスした際、UI はバックエンド API を呼び出して必要なデータを取得する。
 
 - ログイン済みユーザーのチャット一覧を取得する
 - 一覧が 1 件以上ある場合は `last_messaged_at` 降順の先頭チャットを初期表示対象として扱う
 - 一覧が 0 件の場合は、右ペインを未保存の新規チャット入力可能状態として表示する
-- 取得結果はレンダリング済みのHTMLとしてブラウザに返す
-- ローディング状態を極力排除する
+- 初期表示では必要なローディング状態のみを最小限に扱う
 
 この初期取得で利用する API 契約の正本は、[../api/openapi/openapi.yaml](../api/openapi/openapi.yaml) に定義された `GET /api/chats` とする。
 
@@ -51,7 +50,7 @@ UIは、ユーザー向け画面の提供と、初期表示およびユーザー
 
 UI は、クリーンアーキテクチャに基づき以下の責務分離を前提とする。
 
-- フレームワーク層: `app` 相当。Next.js 固有のページ、レイアウト、Server Components、Client Components、Server Actions を置く
+- フレームワーク層: `app` 相当。Vite 配下のルーティング、起動処理、画面エントリーポイントを置く
 - `interface-adapters`: Controller、Presenter、入力変換、画面向け ViewModel 変換を担う
 - `application`: Use Case、アプリケーション境界の型、Repository や Service の抽象を置く
 - `entities`: Entity、Value Object、変わりにくい業務ルールを置く
@@ -81,7 +80,7 @@ UI / presentation 層のコンポーネントは、役割ごとにディレク�
 ユーザーのメッセージ送信は、トップ画面右ペインのチャット画面から Client Components 経由でバックエンド API へリクエストを行う。
 
 - 通信はクライアントサイドで行う
-- 実装例として SWR 等の利用を想定する
+- 実装例として `fetch` ベースの API クライアントや状態管理ライブラリの利用を想定する
 - 新規チャット開始時は右ペインを未保存の新規チャット状態へ切り替え、最初のメッセージ送信時に `POST /api/chats` を利用する
 - 保存済みチャットでは `POST /api/chats/{channel_id}/messages` を利用する
 - バックエンドから返却されたユーザーメッセージをチャット UI へ反映する
@@ -138,10 +137,10 @@ UI / presentation 層のコンポーネントは、役割ごとにディレク�
 
 ## 10. 境界ルール
 
-Next.js 固有 API はフレームワーク層の境界で止める。
+Vite やブラウザ固有 API はフレームワーク層の境界で止める。
 
-- `redirect`、`revalidatePath`、`cookies()`、`headers()`、Server Action の `FormData` などは内側へ漏らさない
-- Next.js 固有型は Use Case や Entity の公開面に持ち込まない
+- `window`、`document`、`localStorage`、`fetch` の直接利用はフレームワーク層または infrastructure 層で閉じる
+- Vite や React Router 固有型は Use Case や Entity の公開面に持ち込まない
 - UI に返す値は Presenter / ViewModel で整形し、Entity や永続化モデルをそのまま返さない
 
 ## 11. API・基盤への依存

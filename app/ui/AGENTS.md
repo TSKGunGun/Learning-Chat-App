@@ -25,16 +25,19 @@
 ## ディレクトリと責務
 
 - フレームワーク層は Vite ベースの UI エントリーポイントとして扱う
+- `app`: ルーティング、アプリ起動、画面エントリーポイント
 - UI / presentation 層では責務ごとにディレクトリを分ける
 - `atoms`: 最小単位の UI 部品
 - `molecules`: 複数 atom を組み合わせた小さな UI
 - `organisms`: 機能的なまとまりを持つ UI ブロック
 - `templates`: 画面レイアウトの骨組み
 - `pages`: ページ単位の UI 構成
+- `interface-adapters`: Controller、Presenter、ViewModel 変換
 - `application`: Use Case、アプリケーション境界の型、抽象
 - `entities`: Entity、Value Object、業務ルール
 - `infrastructure`: API クライアントなど外部依存の実装
 - `di`: 依存解決
+- `shared`: ルート定数、ユーティリティ、共通型
 
 ## 実装ルール
 
@@ -42,6 +45,8 @@
 - 業務ロジックを `atoms`、`molecules`、`organisms` に直接持ち込まない
 - 画面固有のデータ取得や API 呼び出しは UI コンポーネントに閉じず、レイヤー境界を守る
 - 内部 DTO や永続化都合のデータをそのまま表示層へ渡さない
+- UI ルーティングは `react-router-dom` を利用し、`/` と `/login` を最小ルートとして維持する
+- `shadcn/ui` は必要なコンポーネントを `atoms` 配下へ取り込んで育てる
 - トップ画面は左サイドバーのチャット一覧と右チャット画面の 2 ペイン構成を前提とする
 - モバイル時はチャット一覧をドロワー表示とし、右チャット画面を主表示とする
 - `status = pending` の AI メッセージが存在する間は追加送信を無効化する
