@@ -1,8 +1,8 @@
 import { Route, Routes } from "react-router-dom";
 
-import { LoginRoute } from "@/app/routes/LoginRoute";
-import { NotFoundRoute } from "@/app/routes/NotFoundRoute";
-import { TopRoute } from "@/app/routes/TopRoute";
+import { LoginRoute } from "@/framework/routes/LoginRoute";
+import { NotFoundRoute } from "@/framework/routes/NotFoundRoute";
+import { TopRoute } from "@/framework/routes/TopRoute";
 import { ROUTES } from "@/shared/constants/routes";
 
 export function AppRoutes() {

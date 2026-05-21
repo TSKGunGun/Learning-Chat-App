@@ -2,7 +2,7 @@
 
 ## 目的
 
-`app/api` は自己学習型AIチャットシステムの API サーバー実装を担当する。
+`api` は自己学習型AIチャットシステムの API サーバー実装を担当する。
 詳細仕様の正本は以下を参照する。
 
 - `/home/sueda/Lbose/Learning-Chat-App/docs/spec.md`
@@ -39,7 +39,7 @@
 
 ## 完了条件
 
-エージェント実行の完了条件は、`app/api` で以下がすべて通ることとする。
+エージェント実行の完了条件は、`api` で以下がすべて通ることとする。
 
 - `npm run build`
 - `npm run tsc`

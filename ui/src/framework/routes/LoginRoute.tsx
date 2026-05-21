@@ -5,7 +5,7 @@ import { RouteErrorState } from "@/components/organisms/route-error-state";
 import { LoginPage } from "@/components/pages/login/login-page";
 import { AuthPageTemplate } from "@/components/templates/auth-page-template";
 import { container } from "@/di/container";
-import { useRouteLoader } from "@/shared/hooks/use-route-loader";
+import { useRouteLoader } from "@/framework/hooks/use-route-loader";
 
 export function LoginRoute() {
   const loadLoginPage = useCallback(

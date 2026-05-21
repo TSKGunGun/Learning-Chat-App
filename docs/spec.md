@@ -14,9 +14,8 @@ LLM自体のパラメータ更新は行わず、LangChain.js を用いた自己�
 
 ```text
 monorepo/
-├── app/
-│   ├── ui/  (Vite + React)
-│   └── api/ (Node.js + Hono)
+├── ui/  (Vite + React)
+├── api/ (Node.js + Hono)
 └── docker-compose.yml (PostgreSQL)
 ```
 

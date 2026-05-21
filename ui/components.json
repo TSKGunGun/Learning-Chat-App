@@ -15,7 +15,7 @@
     "utils": "@/shared/lib/utils",
     "ui": "@/components/atoms",
     "lib": "@/shared/lib",
-    "hooks": "@/shared/hooks"
+    "hooks": "@/framework/hooks"
   },
   "iconLibrary": "lucide"
 }

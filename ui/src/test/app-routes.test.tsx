@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
-import { AppRoutes } from "@/app/routes/AppRoutes";
+import { AppRoutes } from "@/framework/routes/AppRoutes";
 
 describe("AppRoutes", () => {
   it("renders the top route placeholder", async () => {

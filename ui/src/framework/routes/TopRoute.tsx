@@ -5,7 +5,7 @@ import { RouteErrorState } from "@/components/organisms/route-error-state";
 import { TopPage } from "@/components/pages/top/top-page";
 import { WorkspacePageTemplate } from "@/components/templates/workspace-page-template";
 import { container } from "@/di/container";
-import { useRouteLoader } from "@/shared/hooks/use-route-loader";
+import { useRouteLoader } from "@/framework/hooks/use-route-loader";
 
 export function TopRoute() {
   const loadTopPage = useCallback(() => container.topPageController.handle(), []);

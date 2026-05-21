@@ -50,7 +50,7 @@ UIは、ユーザー向け画面の提供と、初期表示およびユーザー
 
 UI は、クリーンアーキテクチャに基づき以下の責務分離を前提とする。
 
-- フレームワーク層: `app` 相当。Vite 配下のルーティング、起動処理、画面エントリーポイントを置く
+- フレームワーク層: `framework` 相当。Vite 配下のルーティング、起動処理、画面エントリーポイントを置く
 - `interface-adapters`: Controller、Presenter、入力変換、画面向け ViewModel 変換を担う
 - `application`: Use Case、アプリケーション境界の型、Repository や Service の抽象を置く
 - `entities`: Entity、Value Object、変わりにくい業務ルールを置く
