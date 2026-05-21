@@ -90,7 +90,9 @@ APIエンドポイントの正本は本章とする。
 - チャンネル名は最初の会話内容から自動生成する
 - 応答には作成された `channel_id`、決定済みの `channel_name`、追加されたユーザーメッセージの `message_id`、`sender_type`、`message_text`、`created_at` を含める
 - ユーザーメッセージ保存後に AI の応答生成を開始する
+- AI の応答生成開始時に、`sender_type = ai` かつ `status = pending` のメッセージを履歴へ追加する
 - AI による応答メッセージはバックエンド内の処理で完結するため、本 API のレスポンスでは返却対象としない
+- AI 応答生成完了後は、対象 AI メッセージの `status` を `completed` に更新し、回答本文を `message_text` に反映する
 - ユーザーの `message_text` に AI への訂正意図が含まれる場合、対象チャットの全履歴を訂正対象として、同一 API の処理内で自己訂正とルール抽出を行う
 - 新規チャット開始ボタン押下時点では利用せず、実際の初回送信時に利用する
 
@@ -99,7 +101,7 @@ APIエンドポイントの正本は本章とする。
 - 指定されたチャンネル ID に対応する既存チャットを返す
 - 既存チャットを開く操作から利用される
 - 返却内容には対象チャットの `channel_id`、`channel_name`、`last_messaged_at`、チャット履歴を含む前提とする
-- チャット履歴の各メッセージは少なくとも `message_id`、`sender_type`、`message_text`、`ai_feedback`、`created_at` を含む前提とする
+- チャット履歴の各メッセージは少なくとも `message_id`、`sender_type`、`message_text`、`status`、`ai_feedback`、`created_at` を含む前提とする
 - チャット履歴は `created_at` の昇順で返す前提とする
 - ログイン済みユーザー自身のチャットのみ取得対象とする
 
@@ -120,7 +122,8 @@ APIエンドポイントの正本は本章とする。
 - 新規メッセージ追加時に `last_messaged_at` を更新する
 - 応答には追加されたユーザーメッセージの `message_id`、`sender_type`、`message_text`、`created_at` のみを含める
 - AI による応答メッセージはバックエンド内の非同期処理で完結するため、本 API のレスポンスでは返却対象としない
-- ユーザーメッセージ保存直後に応答生成を開始し、AI 応答が完了した時点で `messages` に AI メッセージを追加する
+- ユーザーメッセージ保存直後に応答生成を開始し、`sender_type = ai` かつ `status = pending` のメッセージを履歴へ追加する
+- AI 応答が完了した時点で、対象 AI メッセージの `status` を `completed` に更新し、回答本文を `message_text` に反映する
 - 回答生成では、基盤側で埋め込み生成、類似ルール検索、プロンプト構築、LLM実行を行う
 - 回答生成では、`correction_rules` に加えて過去の `messages.ai_feedback` を学習データとして参照する
 - ユーザーの `message_text` に AI への訂正意図が含まれる場合、対象チャットの全履歴を訂正対象として、同一 API の処理内で自己訂正とルール抽出を行う
@@ -131,7 +134,7 @@ APIエンドポイントの正本は本章とする。
 
 - path parameter として `channel_id` と `message_id` を受け取る
 - 指定された AI メッセージに対する Good / Bad のフィードバックを受け取る
-- リクエスト本文は `ai_feedback` を含み、`true` を `good`、`false` を `bad`、`null` をフィードバック取り消しとして扱う
+- リクエスト本文は `ai_feedback` を含み、`true` を `good`、`false` を `bad` として扱う
 - フィードバック対象メッセージは AI 出力である前提とする
 - `messages.ai_feedback` と `feedback_updated_at` を更新する
 - `good` 済みの状態で再度 `true` を送信した場合、および `bad` 済みの状態で再度 `false` を送信した場合は、`ai_feedback` を `null` に更新して取り消しとして扱う
@@ -152,8 +155,9 @@ APIは以下の前提でUIから利用される。
 - 新規チャット開始および既存チャットを開く操作では、トップ画面上のチャットモーダルを表示する
 - 初期データ読み込みは RSC 経由で行い、`401` の場合は `/login` へ遷移する
 - 保存済みチャットへのメッセージ送信は `POST /api/chats/{channel_id}/messages` を利用する
-- メッセージ送信直後、UI はユーザーメッセージを即時反映し、一時的な AI 応答中ダミーメッセージを表示する
-- UI は `GET /api/chats/{channel_id}` の再取得を通じて AI 応答完了を検知し、ダミーメッセージを実際の AI メッセージ表示へ置き換える
+- メッセージ送信直後、UI はユーザーメッセージを即時反映する
+- UI は `GET /api/chats/{channel_id}` の定期的な再取得を通じて `status = pending` の AI メッセージを検知し、その間は「AI回答生成中」と表示する
+- UI は `GET /api/chats/{channel_id}` の再取得結果で AI メッセージの `status = completed` を検知した時点で、実際の回答本文を表示する
 - メッセージ送信後は `last_messaged_at` と `channel_name` の更新に追従するため、UI はチャット一覧データを再取得してリフレッシュする
 - フィードバック送信は `POST /api/chats/{channel_id}/messages/{message_id}/feedback` を利用する
 - 訂正を求める場合も通常のメッセージ送信 API を利用し、本文の意図判定はバックエンド側で行う

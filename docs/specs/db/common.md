@@ -56,13 +56,15 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 - `id` (UUID, Primary Key)
 - `channel_id` (UUID, Foreign Key): 所属するチャットチャンネルの ID
 - `sender_type` (Text): `user` または `ai`
-- `message_text` (Text): メッセージ本文
+- `message_text` (Text, Nullable): メッセージ本文。AI メッセージが `pending` の間は `null` を許容する
+- `status` (Text): `pending` または `completed`。`sender_type = user` の場合は表示時に無視し、`sender_type = ai` の場合は応答生成状態として扱う
 - `ai_feedback` (Text, Nullable): AI 出力に対する評価。`good` または `bad` を保持し、ユーザー出力の場合は `null` とする
 - `feedback_updated_at` (Timestamp, Nullable): AI メッセージに対するフィードバックの最終更新日時。ユーザー出力の場合は `null` とする
 - `created_at` (Timestamp)
 
 `messages` テーブルにより、1 つのチャットチャンネルに対して複数のメッセージ履歴を保持する。
 `ai_feedback` は AI メッセージに対する Good / Bad 評価を保持し、以後の回答生成時に学習シグナルとして参照する。nullを許容し、未評価時はnullとする。
+`status` は AI 応答の進行状態を表す。`sender_type = ai` かつ `status = pending` の間は回答本文未確定の状態とし、`status = completed` になった時点で `message_text` に回答本文を保持する。
 
 ### `correction_rules` テーブル
 
@@ -94,6 +96,7 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 `POST /api/chats` および `POST /api/chats/{channel_id}/messages` では `correction_rules` と `messages.ai_feedback` を学習データとして参照する。
 `POST /api/chats/{channel_id}/messages/{message_id}/feedback` では対象 AI メッセージの `ai_feedback` を更新する。
 `POST /api/chats` および `POST /api/chats/{channel_id}/messages` では、ユーザーの `message_text` に訂正意図が含まれる場合、対象チャットの全履歴をもとに自己訂正とルール抽出を行い、必要に応じて `correction_rules` に保存する。
+`POST /api/chats` および `POST /api/chats/{channel_id}/messages` では、ユーザーメッセージ保存後に `sender_type = ai` かつ `status = pending` のメッセージを作成し、回答生成完了後に `status = completed` と `message_text` を更新する。
 
 ## 5. ORM とベクトル検索
 
