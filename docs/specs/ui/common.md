@@ -66,11 +66,18 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - 実装例として SWR 等の利用を想定する
 - 新規チャットでは最初のメッセージ送信時に `POST /api/chats` を利用し、保存済みチャットでは `POST /api/chats/{channel_id}/messages` を利用する
 - バックエンドから返却されたユーザーメッセージをチャット UI へ反映する
-- メッセージ送信後は対象チャットの履歴を定期的に再取得し、バックエンド内で生成・更新された AI 応答を反映する
+- `POST /api/chats` および `POST /api/chats/{channel_id}/messages` の成功レスポンスに `channel_name` が含まれる場合、UI はレスポンス受信時点でチャットモーダルの見出しへ即時反映する
+- メッセージ送信後は対象チャットの履歴を 1 秒間隔で定期的に再取得し、バックエンド内で生成・更新された AI 応答を反映する
 - `sender_type = ai` かつ `status = pending` のメッセージは、本文の代わりに「AI回答生成中」と表示する
 - `sender_type = ai` かつ `status = completed` のメッセージは、`message_text` を表示する
+- `sender_type = ai` かつ `status = ai_timeout` のメッセージは、`message_text` に設定された `AI応答がありません` を表示する
 - `sender_type = user` のメッセージは `status` を無視して表示する
+- `status = pending` の AI メッセージが存在する間は、追加メッセージ送信を無効化する
+- 既存チャットを開いた時点で `status = pending` の AI メッセージが存在する場合は、最初の履歴取得結果をもとにその時点で定期再取得を開始する
+- `status = completed` または `status = ai_timeout` をポーリングで検知した場合も、`last_messaged_at` と `channel_name` の更新に追従するためチャット一覧データをリフレッシュする
+- 定期再取得は、対象チャット内に `status = pending` の AI メッセージがなくなった時点、またはチャットモーダルを閉じた時点で停止する
 - メッセージ送信後は `last_messaged_at` と `channel_name` の更新に追従するため、チャット一覧データをリフレッシュする
+- 追加メッセージ送信を行った場合、`status = pending` の AI メッセージが存在する間は UI で入力を無効化し、API 側でも `422` により拒否される前提とする
 
 この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats` および `POST /api/chats/{channel_id}/messages` とする。
 
@@ -89,7 +96,8 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 ユーザーが AI メッセージに対して Good / Bad のフィードバックを送信できるようにする。
 
 - フィードバック操作はクライアントサイドからバックエンド API へ送信する
-- UI は AI メッセージごとに Good ボタンと Bad ボタンを表示できるようにする
+- UI は `sender_type = ai` かつ `status = completed` のメッセージに対してのみ Good ボタンと Bad ボタンを表示する
+- `status = pending` または `status = ai_timeout` の AI メッセージにはフィードバックボタンを表示しない
 - フィードバック送信時は `ai_feedback` を `true` または `false` で送る
 - `true` は Good、`false` は Bad として扱う
 - 既に Good 済みのメッセージへ再度 Good を送信した場合、および既に Bad 済みのメッセージへ再度 Bad を送信した場合も、UI は同じ `true` または `false` を送信する

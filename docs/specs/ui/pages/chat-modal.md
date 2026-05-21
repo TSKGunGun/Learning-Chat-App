@@ -41,8 +41,10 @@ UI は LINE のようなチャット画面を前提とし、会話の流れを�
 - ユーザーのメッセージと AI のメッセージは視覚的に区別できるように表示する
 - 会話の新しいメッセージが下に積み上がる、LINE ライクな UI を前提とする
 - モーダル下部にメッセージ入力欄と送信操作を配置する
-- AI メッセージごとに Good ボタンと Bad ボタンを配置できるようにする
+- `status = pending` の AI メッセージが存在する間は、メッセージ入力欄と送信操作を無効化する
+- `sender_type = ai` かつ `status = completed` のメッセージに対してのみ Good ボタンと Bad ボタンを配置できるようにする
 - Good ボタンと Bad ボタンは、各 AI メッセージの UI 要素の直下に配置する
+- `status = pending` または `status = ai_timeout` の AI メッセージには Good ボタンと Bad ボタンを表示しない
 
 ## 7. モーダル内でのチャット操作
 
@@ -50,10 +52,17 @@ UI は LINE のようなチャット画面を前提とし、会話の流れを�
 - 未保存の新規チャットで最初のメッセージ送信を行う場合は、`POST /api/chats` を利用する前提とする
 - 保存済みチャットでメッセージ送信を行う場合は、対象チャットの `channel_id` を path parameter に含む `POST /api/chats/{channel_id}/messages` を利用する前提とする
 - メッセージ送信成功後は、返却されたユーザーメッセージを UI 状態に反映する
-- メッセージ送信後は `GET /api/chats/{channel_id}` を定期的に再取得し、バックエンド内で生成・更新された AI 応答をチャット履歴へ反映する
+- `POST /api/chats` または `POST /api/chats/{channel_id}/messages` の成功レスポンスに `channel_name` が含まれる場合、チャットモーダルの見出しはその時点で即時更新する
+- メッセージ送信後は `GET /api/chats/{channel_id}` を 1 秒間隔で定期的に再取得し、バックエンド内で生成・更新された AI 応答をチャット履歴へ反映する
 - `sender_type = ai` かつ `status = pending` のメッセージは「AI回答生成中」と表示する
 - `sender_type = ai` かつ `status = completed` のメッセージは `message_text` を表示する
+- `sender_type = ai` かつ `status = ai_timeout` のメッセージは `AI応答がありません` を表示する
 - `sender_type = user` のメッセージは `status` を無視して `message_text` を表示する
+- 既存チャットを開いた時点で `status = pending` の AI メッセージが存在する場合は、最初の履歴取得結果をもとにその時点で定期再取得を開始する
+- `status = completed` または `status = ai_timeout` をポーリングで検知した場合も、`last_messaged_at` と `channel_name` の更新に追従するためトップ画面のチャット一覧をリフレッシュする
+- 定期再取得は、対象チャット内に `status = pending` の AI メッセージがなくなった時点、またはモーダルを閉じた時点で停止する
+- `status = pending` の AI メッセージが存在する間は、追加メッセージ送信を受け付けない
+- `status = pending` の間に送信操作が行われた場合、API 側でも `422` により拒否される前提とする
 - メッセージ送信後は `last_messaged_at` と `channel_name` の更新に追従するため、トップ画面のチャット一覧をリフレッシュできるようにする
 - モーダル内から AI メッセージへのフィードバック送信を行う場合は、対象チャットの `channel_id` と対象 AI メッセージの `message_id` を path parameter に含む `POST /api/chats/{channel_id}/messages/{message_id}/feedback` を利用する前提とする
 - フィードバック送信時は `ai_feedback` を `true` または `false` で扱い、同一評価の再送でも同じ値を送信する

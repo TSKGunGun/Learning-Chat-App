@@ -43,11 +43,12 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key): チャット所有者のユーザー ID
 - `channel_name` (Text): チャンネル名。未保存の新規チャットは UI 上で `新規チャット` として扱い、最初のユーザーメッセージ送信時に会話内容から自動生成した名称を保存する
+- `is_deleted` (Boolean): 削除フラグ。初期値は `false` とし、削除済みチャンネルは一覧および通常取得対象から除外する
 - `last_messaged_at` (Timestamp): 最後にメッセージが追加された日時。チャットチャンネル生成時に最初のメッセージ時刻を設定し、以後の新規メッセージ追加時に更新する
 - `created_at` (Timestamp)
 - `updated_at` (Timestamp)
 
-`chat_channels` テーブル自体はチャットチャンネルの単位を表し、最初のユーザーメッセージ送信時に生成される。チャット履歴は `messages` テーブルで管理する。
+`chat_channels` テーブル自体はチャットチャンネルの単位を表し、最初のユーザーメッセージ送信時に生成される。チャット履歴は `messages` テーブルで管理する。削除時は物理削除ではなく `is_deleted = true` のソフトデリートとし、履歴データおよび学習データは保持する。
 
 ### `messages` テーブル
 
@@ -57,14 +58,17 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 - `channel_id` (UUID, Foreign Key): 所属するチャットチャンネルの ID
 - `sender_type` (Text): `user` または `ai`
 - `message_text` (Text, Nullable): メッセージ本文。AI メッセージが `pending` の間は `null` を許容する
-- `status` (Text): `pending` または `completed`。`sender_type = user` の場合は表示時に無視し、`sender_type = ai` の場合は応答生成状態として扱う
-- `ai_feedback` (Text, Nullable): AI 出力に対する評価。`good` または `bad` を保持し、ユーザー出力の場合は `null` とする
+- `status` (Text): 固定 enum。`pending`、`completed`、`ai_timeout` のみを許容する。`sender_type = user` の場合は常に `completed` を保持し、表示時に無視する。`sender_type = ai` の場合は応答生成状態として扱う
+- `ai_feedback` (Text, Nullable): AI 出力に対する評価。`good` または `bad` を保持し、ユーザー出力および `status = pending` の AI メッセージの場合は `null` とする
 - `feedback_updated_at` (Timestamp, Nullable): AI メッセージに対するフィードバックの最終更新日時。ユーザー出力の場合は `null` とする
 - `created_at` (Timestamp)
 
 `messages` テーブルにより、1 つのチャットチャンネルに対して複数のメッセージ履歴を保持する。
 `ai_feedback` は AI メッセージに対する Good / Bad 評価を保持し、以後の回答生成時に学習シグナルとして参照する。nullを許容し、未評価時はnullとする。
-`status` は AI 応答の進行状態を表す。`sender_type = ai` かつ `status = pending` の間は回答本文未確定の状態とし、`status = completed` になった時点で `message_text` に回答本文を保持する。
+`status` は固定 enum とし、`pending`、`completed`、`ai_timeout` の 3 値のみを許容する。`sender_type = ai` かつ `status = pending` の間は回答本文未確定の状態とし、`status = completed` になった時点で `message_text` に回答本文を保持する。AI 応答生成開始から 60 秒以内に完了しない場合は `status = ai_timeout`、`message_text = AI応答がありません` とする。
+`sender_type = user` のメッセージは常に `status = completed` とする。
+`sender_type = ai` かつ `status = pending` のメッセージは、`ai_feedback = null` とする。
+`feedback_updated_at` は保持専用カラムとし、API の返却対象には含めない。
 
 ### `correction_rules` テーブル
 
@@ -77,7 +81,7 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 - `embedding` (vector(1536)): OpenAI APIで生成されたベクトルデータ
 - `created_at` (Timestamp)
 
-`correction_rules` は単一の AI メッセージではなく、対象チャットチャンネルの全履歴をもとに抽出されたルールを保持する。
+`correction_rules` は単一の AI メッセージではなく、対象チャットチャンネルの全履歴をもとに抽出されたルールを保持する。チャットチャンネルが削除済みになっても `correction_rules` は削除せず、以後の回答生成で学習データとして参照可能とする。
 
 ## 4. 永続化責務
 
@@ -90,13 +94,17 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 
 `POST /api/auth/login` では `users` を認証対象として参照する。
 `GET /api/chats`、`POST /api/chats`、`GET /api/chats/{channel_id}`、`DELETE /api/chats/{channel_id}` では `chat_channels` をログイン済みユーザー単位で参照または更新する。
-`POST /api/chats` では、最初のユーザーメッセージ送信時に `chat_channels` を生成し、`channel_name` と `last_messaged_at` を設定する。
+`POST /api/chats` では、最初のユーザーメッセージ送信時に `chat_channels` を生成し、`is_deleted = false`、`channel_name`、`last_messaged_at` を設定する。
 `GET /api/chats/{channel_id}`、`POST /api/chats`、`POST /api/chats/{channel_id}/messages` では `messages` をチャット履歴として参照または追加する。
-`POST /api/chats/{channel_id}/messages` では、新規メッセージ追加時に `chat_channels.last_messaged_at` を更新する。
+`GET /api/chats` および `GET /api/chats/{channel_id}` の通常取得対象は `is_deleted = false` のチャンネルに限る。
+`DELETE /api/chats/{channel_id}` では `chat_channels.is_deleted` を `true` に更新し、物理削除は行わない。
+`POST /api/chats` および `POST /api/chats/{channel_id}/messages` では、ユーザーメッセージ追加時、`sender_type = ai` かつ `status = pending` の AI メッセージ生成時、AI メッセージの `status = completed` 更新時、AI メッセージの `status = ai_timeout` 更新時のすべてで `chat_channels.last_messaged_at` を更新する。
 `POST /api/chats` および `POST /api/chats/{channel_id}/messages` では `correction_rules` と `messages.ai_feedback` を学習データとして参照する。
 `POST /api/chats/{channel_id}/messages/{message_id}/feedback` では対象 AI メッセージの `ai_feedback` を更新する。
 `POST /api/chats` および `POST /api/chats/{channel_id}/messages` では、ユーザーの `message_text` に訂正意図が含まれる場合、対象チャットの全履歴をもとに自己訂正とルール抽出を行い、必要に応じて `correction_rules` に保存する。
 `POST /api/chats` および `POST /api/chats/{channel_id}/messages` では、ユーザーメッセージ保存後に `sender_type = ai` かつ `status = pending` のメッセージを作成し、回答生成完了後に `status = completed` と `message_text` を更新する。
+`POST /api/chats` および `POST /api/chats/{channel_id}/messages` では、対象チャット内に `status = pending` の AI メッセージが存在する間、新規メッセージ送信を受け付けず、API は `422` を返す。
+`POST /api/chats` および `POST /api/chats/{channel_id}/messages` で保存されるユーザーメッセージは、`sender_type = user` かつ `status = completed` とする。
 
 ## 5. ORM とベクトル検索
 
