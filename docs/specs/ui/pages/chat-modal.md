@@ -4,7 +4,7 @@
 
 本書は、トップ画面上で表示されるチャットモーダルの仕様を定義する。
 
-共通の UI 方針は [../common.md](../common.md)、関連するトップ画面仕様は [top.md](./top.md)、API の正本は [../../api/common.md](../../api/common.md) を参照する。
+共通の UI 方針は [../common.md](../common.md)、関連するトップ画面仕様は [top.md](./top.md)、API 契約の正本は [../../api/openapi/openapi.yaml](../../api/openapi/openapi.yaml) を参照する。
 
 ## 2. モーダル概要
 

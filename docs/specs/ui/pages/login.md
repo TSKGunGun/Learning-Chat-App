@@ -4,7 +4,7 @@
 
 本書は、ログイン画面 `/login` の仕様を定義する。
 
-共通の UI 方針は [../common.md](../common.md)、ログイン API の正本は [../../api/common.md](../../api/common.md) を参照する。
+共通の UI 方針は [../common.md](../common.md)、ログイン API の契約正本は [../../api/openapi/openapi.yaml](../../api/openapi/openapi.yaml) を参照する。
 
 ## 2. 画面概要
 

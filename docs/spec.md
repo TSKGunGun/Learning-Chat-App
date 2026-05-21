@@ -41,7 +41,7 @@ UI およびバックエンドは、クリーンアーキテクチャを採用�
 - 画面や API の入口は Controller 相当の調停層を経由し、Use Case と外部依存を分離する
 - 外部依存は Infrastructure 層で吸収し、Use Case は抽象に依存する
 
-UI 側の詳細設計原則は [UI仕様（共通）](./specs/ui/common.md)、バックエンド側の詳細設計原則は [API仕様（共通）](./specs/api/common.md) を参照する。
+UI 側の詳細設計原則は [UI仕様（共通）](./specs/ui/common.md)、バックエンド側の詳細設計原則は [API仕様（共通）](./specs/api/common.md) を参照する。HTTP 契約の正本は [OpenAPI定義](./specs/api/openapi/openapi.yaml) を参照する。
 
 ## 5. 全体処理フロー
 
@@ -61,7 +61,9 @@ UI 側の詳細設計原則は [UI仕様（共通）](./specs/ui/common.md)、�
 - [UI仕様（共通）](./specs/ui/common.md)
   - 画面初期表示、クライアント通信、UIの責務とAPI依存を扱う。
 - [API仕様（共通）](./specs/api/common.md)
-  - Hono API の責務、エンドポイント一覧、リクエスト起点の処理責務を扱う。
+  - Hono API の責務、レイヤー責務、サーバー側の処理責務を扱う。
+- [OpenAPI定義](./specs/api/openapi/openapi.yaml)
+  - request / response / 認証 / HTTP ステータス契約の正本を扱う。
 - [DB仕様（共通）](./specs/db/common.md)
   - データモデル、永続化責務、ベクトル検索対象を扱う。
 - [基盤仕様（共通）](./specs/infra/common.md)
@@ -70,6 +72,7 @@ UI 側の詳細設計原則は [UI仕様（共通）](./specs/ui/common.md)、�
 ## 7. 参照方針
 
 - UI仕様の正本は [UI仕様（共通）](./specs/ui/common.md) とする。
-- API定義の正本は [API仕様（共通）](./specs/api/common.md) とする。
+- API サーバー責務の正本は [API仕様（共通）](./specs/api/common.md) とする。
+- HTTP 契約の正本は [OpenAPI定義](./specs/api/openapi/openapi.yaml) とする。
 - データモデルの正本は [DB仕様（共通）](./specs/db/common.md) とする。
 - 技術基盤と構成前提の正本は [基盤仕様（共通）](./specs/infra/common.md) とする。

@@ -1,0 +1,130 @@
+messages:
+  post:
+    tags:
+      - Messages
+    summary: 既存チャットへのメッセージ送信
+    description: |
+      指定した未削除チャットチャンネルへユーザーメッセージを送信し、AI 応答生成を開始する。
+
+      サーバー側では次を行う。
+
+      - `message_text` を受け取る
+      - ログイン済みユーザー自身の未削除チャットのみ処理対象とする
+      - 対象チャット内に `pending` の AI メッセージが存在する間は追加送信を拒否する
+      - ユーザーメッセージを保存する
+      - `last_messaged_at` をユーザーメッセージ保存時に更新する
+      - AI 応答生成を開始し、`sender_type = ai` かつ `status = pending` のメッセージを作成する
+      - AI 応答完了時は対象 AI メッセージを `completed` に更新し、回答本文を反映する
+      - 60 秒以内に完了しない場合は `ai_timeout` とし、`message_text` を `AI応答がありません` に更新する
+      - `last_messaged_at` は `pending` 生成時、`completed` 更新時、`ai_timeout` 更新時にも更新する
+      - 回答生成では埋め込み生成、類似ルール検索、プロンプト構築、LLM 実行を行う
+      - 回答生成では `correction_rules` と過去の `messages.ai_feedback` を学習データとして参照する
+      - `message_text` に訂正意図が含まれる場合は、対象チャットの全履歴をもとに自己訂正とルール抽出を行う
+
+      AI による応答メッセージ自体はレスポンスには含めず、バックエンド内の非同期処理で完結する。
+    operationId: sendMessageToChat
+    parameters:
+      - name: channel_id
+        in: path
+        required: true
+        description: 送信対象チャットチャンネルの ID
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas.yaml#/SendMessageRequest
+    responses:
+      '200':
+        description: "ユーザーメッセージ保存に成功。現在の `channel_name` と追加されたユーザーメッセージを返す。"
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/SendMessageResponse
+      '401':
+        description: 未認証または認証切れ
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '404':
+        description: 存在しないチャンネル、削除済みチャンネル、または他ユーザー所有チャンネル
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '422':
+        description: 対象チャット内に pending の AI メッセージが存在するなど、業務条件に違反
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+
+messageFeedback:
+  post:
+    tags:
+      - Messages
+    summary: AI メッセージへのフィードバック送信
+    description: |
+      指定した AI メッセージに対して Good / Bad フィードバックを保存する。
+
+      サーバー側では次を行う。
+
+      - 対象メッセージが `sender_type = ai` かつ `status = completed` であることを前提とする
+      - `messages.ai_feedback` と `feedback_updated_at` を更新する
+      - `true` は Good、`false` は Bad として扱う
+      - 既に Good 済みのメッセージへ再度 `true` を送った場合、および既に Bad 済みのメッセージへ再度 `false` を送った場合は取り消しとして `ai_feedback = null` に更新する
+      - 反対側の値が送られた場合はその値で上書き更新する
+      - 保存したフィードバックは以後の回答生成時に学習データとして参照する
+
+      `pending` または `ai_timeout` の AI メッセージは評価対象外とする。
+    operationId: sendMessageFeedback
+    parameters:
+      - name: channel_id
+        in: path
+        required: true
+        description: 対象 AI メッセージが属するチャットチャンネルの ID
+        schema:
+          type: string
+          format: uuid
+      - name: message_id
+        in: path
+        required: true
+        description: フィードバック対象 AI メッセージの ID
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas.yaml#/FeedbackRequest
+    responses:
+      '200':
+        description: "フィードバック更新成功。更新後の `message_id` と `ai_feedback` を返す。"
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/FeedbackResponse
+      '401':
+        description: 未認証または認証切れ
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '404':
+        description: 削除済みチャンネル、他ユーザー所有チャンネル、存在しない message_id、または user メッセージ指定
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '422':
+        description: pending または ai_timeout の AI メッセージなど、業務条件に違反
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse

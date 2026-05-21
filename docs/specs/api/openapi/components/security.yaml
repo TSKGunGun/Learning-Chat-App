@@ -1,0 +1,5 @@
+CookieSessionAuth:
+  type: apiKey
+  in: cookie
+  name: session
+  description: ログイン成功時に設定される Cookie セッション

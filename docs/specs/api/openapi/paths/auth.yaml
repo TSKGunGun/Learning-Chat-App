@@ -1,0 +1,48 @@
+login:
+  post:
+    tags:
+      - Auth
+    summary: ログイン
+    description: |
+      ユーザー名とパスワードで認証し、Cookie セッションを確立する。
+
+      サーバー側では次を行う。
+
+      - `users` テーブルを参照して資格情報を検証する
+      - 入力不備を検証する
+      - 認証成功時に Cookie セッションを設定する
+      - 成功時は最小限のユーザー要約を返す
+
+      認証失敗時は認証状態を変更しない。
+    operationId: login
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas.yaml#/LoginRequest
+    responses:
+      '200':
+        description: "ログイン成功。`Set-Cookie` によりセッション Cookie が設定される。"
+        headers:
+          Set-Cookie:
+            description: セッション Cookie
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/LoginResponse
+      '400':
+        description: "入力不備。`username` または `password` の欠落や不正形式。"
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '401':
+        description: 認証失敗。ユーザー名またはパスワードが一致しない。
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse

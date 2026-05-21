@@ -1,0 +1,68 @@
+openapi: 3.0.3
+info:
+  title: Self-Learning Chat API
+  version: 1.0.0
+  description: |
+    自己学習型AIチャットシステムの HTTP 契約の正本。
+    API サーバーとしての責務や業務処理は ../common.md を参照する。
+servers:
+  - url: /
+tags:
+  - name: Auth
+    description: 認証関連 API
+  - name: Chats
+    description: チャットチャンネル関連 API
+  - name: Messages
+    description: メッセージ送信とフィードバック関連 API
+security:
+  - CookieSessionAuth: []
+paths:
+  /api/auth/login:
+    $ref: ./paths/auth.yaml#/login
+  /api/chats:
+    $ref: ./paths/chats.yaml#/chats
+  /api/chats/{channel_id}:
+    $ref: ./paths/chats.yaml#/chatById
+  /api/chats/{channel_id}/messages:
+    $ref: ./paths/messages.yaml#/messages
+  /api/chats/{channel_id}/messages/{message_id}/feedback:
+    $ref: ./paths/messages.yaml#/messageFeedback
+components:
+  securitySchemes:
+    CookieSessionAuth:
+      $ref: ./components/security.yaml#/CookieSessionAuth
+  schemas:
+    ErrorResponse:
+      $ref: ./components/schemas.yaml#/ErrorResponse
+    UserSummary:
+      $ref: ./components/schemas.yaml#/UserSummary
+    LoginRequest:
+      $ref: ./components/schemas.yaml#/LoginRequest
+    LoginResponse:
+      $ref: ./components/schemas.yaml#/LoginResponse
+    ChatChannelSummary:
+      $ref: ./components/schemas.yaml#/ChatChannelSummary
+    ChatListResponse:
+      $ref: ./components/schemas.yaml#/ChatListResponse
+    CreateChatRequest:
+      $ref: ./components/schemas.yaml#/CreateChatRequest
+    SendMessageRequest:
+      $ref: ./components/schemas.yaml#/SendMessageRequest
+    SenderType:
+      $ref: ./components/schemas.yaml#/SenderType
+    MessageStatus:
+      $ref: ./components/schemas.yaml#/MessageStatus
+    UserMessageResponse:
+      $ref: ./components/schemas.yaml#/UserMessageResponse
+    CreateChatResponse:
+      $ref: ./components/schemas.yaml#/CreateChatResponse
+    SendMessageResponse:
+      $ref: ./components/schemas.yaml#/SendMessageResponse
+    ChatMessage:
+      $ref: ./components/schemas.yaml#/ChatMessage
+    ChatDetailResponse:
+      $ref: ./components/schemas.yaml#/ChatDetailResponse
+    FeedbackRequest:
+      $ref: ./components/schemas.yaml#/FeedbackRequest
+    FeedbackResponse:
+      $ref: ./components/schemas.yaml#/FeedbackResponse

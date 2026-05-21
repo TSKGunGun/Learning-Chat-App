@@ -1,0 +1,240 @@
+ErrorResponse:
+  type: object
+  description: エラー応答
+  required:
+    - message
+  properties:
+    message:
+      type: string
+      description: エラー内容を表すメッセージ
+
+UserSummary:
+  type: object
+  description: ログイン成功時に返す最小限のユーザー要約
+  required:
+    - id
+    - username
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: ユーザー ID
+    username:
+      type: string
+      description: ユーザー名
+
+LoginRequest:
+  type: object
+  description: ログイン要求
+  required:
+    - username
+    - password
+  properties:
+    username:
+      type: string
+      description: ログイン時に使用するユーザー名
+    password:
+      type: string
+      description: ログイン時に使用するパスワード
+
+LoginResponse:
+  description: ログイン成功応答
+  allOf:
+    - $ref: '#/UserSummary'
+
+ChatChannelSummary:
+  type: object
+  description: チャット一覧に表示するチャンネル要約
+  required:
+    - channel_id
+    - channel_name
+    - last_messaged_at
+  properties:
+    channel_id:
+      type: string
+      format: uuid
+      description: チャットチャンネル ID
+    channel_name:
+      type: string
+      description: チャンネル名
+    last_messaged_at:
+      type: string
+      format: date-time
+      description: 最後にメッセージ関連イベントが発生した日時
+
+ChatListResponse:
+  type: array
+  description: チャット一覧応答
+  items:
+    $ref: '#/ChatChannelSummary'
+
+CreateChatRequest:
+  type: object
+  description: 新規チャット初回送信要求
+  required:
+    - message_text
+  properties:
+    message_text:
+      type: string
+      description: 最初のユーザーメッセージ本文
+
+SendMessageRequest:
+  type: object
+  description: 既存チャットへのメッセージ送信要求
+  required:
+    - message_text
+  properties:
+    message_text:
+      type: string
+      description: ユーザーが入力したメッセージ本文
+
+SenderType:
+  type: string
+  description: メッセージ送信者種別
+  enum:
+    - user
+    - ai
+
+MessageStatus:
+  type: string
+  description: AI 応答生成状態を表す固定 enum
+  enum:
+    - pending
+    - completed
+    - ai_timeout
+
+UserMessageResponse:
+  type: object
+  description: ユーザーメッセージ保存直後に返す応答
+  required:
+    - message_id
+    - sender_type
+    - message_text
+    - status
+    - created_at
+  properties:
+    message_id:
+      type: string
+      format: uuid
+      description: 追加されたユーザーメッセージの ID
+    sender_type:
+      $ref: '#/SenderType'
+    message_text:
+      type: string
+      description: 保存されたユーザーメッセージ本文
+    status:
+      $ref: '#/MessageStatus'
+    created_at:
+      type: string
+      format: date-time
+      description: メッセージ作成日時
+
+CreateChatResponse:
+  description: 新規チャット生成と初回メッセージ保存の応答
+  allOf:
+    - $ref: '#/UserMessageResponse'
+    - type: object
+      required:
+        - channel_id
+        - channel_name
+      properties:
+        channel_id:
+          type: string
+          format: uuid
+          description: 新規生成されたチャットチャンネル ID
+        channel_name:
+          type: string
+          description: 初回会話内容から自動生成されたチャンネル名
+
+SendMessageResponse:
+  description: 既存チャットへのメッセージ送信応答
+  allOf:
+    - $ref: '#/UserMessageResponse'
+    - type: object
+      required:
+        - channel_name
+      properties:
+        channel_name:
+          type: string
+          description: 現在のチャンネル名
+
+ChatMessage:
+  type: object
+  description: チャット履歴メッセージ
+  required:
+    - message_id
+    - sender_type
+    - status
+    - created_at
+  properties:
+    message_id:
+      type: string
+      format: uuid
+      description: メッセージ ID
+    sender_type:
+      $ref: '#/SenderType'
+    message_text:
+      type: string
+      nullable: true
+      description: sender_type が ai かつ status が pending の場合は null になりうる
+    status:
+      $ref: '#/MessageStatus'
+    ai_feedback:
+      type: boolean
+      nullable: true
+      description: AI メッセージに対する評価。sender_type が ai かつ status が pending の場合は null とする
+    created_at:
+      type: string
+      format: date-time
+      description: メッセージ作成日時
+
+ChatDetailResponse:
+  type: object
+  description: 既存チャット詳細応答
+  required:
+    - channel_id
+    - channel_name
+    - last_messaged_at
+    - messages
+  properties:
+    channel_id:
+      type: string
+      format: uuid
+      description: チャットチャンネル ID
+    channel_name:
+      type: string
+      description: チャンネル名
+    last_messaged_at:
+      type: string
+      format: date-time
+      description: 最後にメッセージ関連イベントが発生した日時
+    messages:
+      type: array
+      description: "`created_at` 昇順で返されるチャット履歴"
+      items:
+        $ref: '#/ChatMessage'
+
+FeedbackRequest:
+  type: object
+  description: AI メッセージへのフィードバック送信要求
+  required:
+    - ai_feedback
+  properties:
+    ai_feedback:
+      type: boolean
+      description: true は Good、false は Bad
+
+FeedbackResponse:
+  type: object
+  description: フィードバック更新応答
+  required:
+    - message_id
+  properties:
+    message_id:
+      type: string
+      format: uuid
+      description: フィードバックを更新したメッセージ ID
+    ai_feedback:
+      type: boolean
+      nullable: true
+      description: 同一評価の再送時は null となる

@@ -31,7 +31,7 @@
 - API サーバーは Node.js 実行環境上で動作する
 - UI からの `POST /api/auth/login`、`GET /api/chats`、`POST /api/chats`、`GET /api/chats/{channel_id}`、`DELETE /api/chats/{channel_id}`、`POST /api/chats/{channel_id}/messages`、`POST /api/chats/{channel_id}/messages/{message_id}/feedback` を受け付ける
 - API サーバーはデータベースと外部 AI サービスへ接続して動作する
-- API エンドポイントの正本は [../api/common.md](../api/common.md) を参照する
+- API サーバー責務は [../api/common.md](../api/common.md)、HTTP 契約の正本は [../api/openapi/openapi.yaml](../api/openapi/openapi.yaml) を参照する
 
 ## 5. 外部接続前提
 

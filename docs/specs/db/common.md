@@ -4,7 +4,7 @@
 
 本書は、自己学習型AIチャットシステムにおけるDB共通仕様を定義する。データモデル、永続化責務、ベクトル検索対象、および Drizzle ORM と PostgreSQL + `pgvector` の関係を扱う。
 
-全体概要は [../../spec.md](../../spec.md)、APIの正本は [../api/common.md](../api/common.md) を参照する。
+全体概要は [../../spec.md](../../spec.md)、API サーバー責務は [../api/common.md](../api/common.md)、HTTP 契約の正本は [../api/openapi/openapi.yaml](../api/openapi/openapi.yaml) を参照する。
 
 ## 2. DBの責務
 

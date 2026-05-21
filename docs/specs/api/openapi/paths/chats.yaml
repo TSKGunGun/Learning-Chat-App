@@ -1,0 +1,157 @@
+chats:
+  get:
+    tags:
+      - Chats
+    summary: チャット一覧取得
+    description: |
+      ログイン済みユーザーの未削除チャットチャンネル一覧を取得する。
+
+      サーバー側では次を行う。
+
+      - ログイン済みユーザー単位で `chat_channels` を参照する
+      - `is_deleted = false` のチャンネルのみを返す
+      - 少なくとも 1 件以上のメッセージ履歴を持つ保存済みチャンネルのみを返す
+      - `last_messaged_at` の降順で一覧を返す
+
+      トップ画面の初期表示で利用される。
+    operationId: listChats
+    responses:
+      '200':
+        description: "一覧取得成功。各要素は `channel_id`、`channel_name`、`last_messaged_at` を含む。"
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ChatListResponse
+      '401':
+        description: 未認証または認証切れ
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+  post:
+    tags:
+      - Chats
+    summary: 新規チャット初回メッセージ送信
+    description: |
+      未保存の新規チャットに対する最初のメッセージ送信とチャットチャンネル生成を行う。
+
+      新規チャット開始ボタン押下時点ではこの API は呼ばれず、最初の送信時にのみ利用される。
+
+      サーバー側では次を行う。
+
+      - `message_text` を受け取る
+      - `chat_channels` を新規生成する
+      - 新規チャンネルは `is_deleted = false` として作成する
+      - 初回ユーザーメッセージを保存する
+      - 会話内容から `channel_name` を自動決定する
+      - `last_messaged_at` を初回ユーザーメッセージ保存時に更新する
+      - AI 応答生成を開始し、`sender_type = ai` かつ `status = pending` のメッセージを作成する
+      - AI 応答完了時は対象 AI メッセージを `completed` に更新する
+      - 60 秒以内に完了しない場合は `ai_timeout` とし、`message_text` を `AI応答がありません` に更新する
+      - `last_messaged_at` は `pending` 生成時、`completed` 更新時、`ai_timeout` 更新時にも更新する
+      - `message_text` に訂正意図が含まれる場合は、対象チャットの全履歴をもとに自己訂正とルール抽出を行う
+
+      AI による応答メッセージ自体はレスポンスには含めず、バックエンド内処理で完結する。
+    operationId: createChatWithFirstMessage
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas.yaml#/CreateChatRequest
+    responses:
+      '200':
+        description: "チャット生成とユーザーメッセージ保存に成功。作成済み `channel_id`、`channel_name`、追加されたユーザーメッセージを返す。"
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/CreateChatResponse
+      '401':
+        description: 未認証または認証切れ
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+
+chatById:
+  get:
+    tags:
+      - Chats
+    summary: 既存チャット取得
+    description: |
+      指定した未削除チャットチャンネルの履歴を取得する。
+
+      サーバー側では次を行う。
+
+      - ログイン済みユーザー自身の未削除チャットのみ参照対象とする
+      - 対象チャットの `channel_id`、`channel_name`、`last_messaged_at`、履歴を返す
+      - 履歴は `created_at` の昇順で返す
+      - `sender_type = ai` かつ `status = pending` のメッセージでは `message_text` は `null` になりうる
+      - `sender_type = ai` かつ `status = pending` のメッセージでは `ai_feedback` は `null` とする
+    operationId: getChatById
+    parameters:
+      - name: channel_id
+        in: path
+        required: true
+        description: 取得対象チャットチャンネルの ID
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: チャット取得成功
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ChatDetailResponse
+      '401':
+        description: 未認証または認証切れ
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '404':
+        description: 存在しないチャンネル、削除済みチャンネル、または他ユーザー所有チャンネル
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+  delete:
+    tags:
+      - Chats
+    summary: 既存チャット削除
+    description: |
+      指定した未削除チャットチャンネルをソフトデリートする。
+
+      サーバー側では次を行う。
+
+      - `chat_channels.is_deleted = true` に更新する
+      - 物理削除は行わない
+      - `messages` は保持する
+      - `correction_rules` は削除せず、以後も学習データとして利用可能な状態を保つ
+
+      削除済みチャンネルは一覧と通常取得の対象から除外される。
+    operationId: deleteChatById
+    parameters:
+      - name: channel_id
+        in: path
+        required: true
+        description: 削除対象チャットチャンネルの ID
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '204':
+        description: 削除成功。レスポンスボディは返さない。
+      '401':
+        description: 未認証または認証切れ
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '404':
+        description: 存在しないチャンネル、削除済みチャンネル、または他ユーザー所有チャンネル
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse

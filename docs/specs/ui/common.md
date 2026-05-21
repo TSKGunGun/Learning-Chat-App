@@ -4,7 +4,7 @@
 
 本書は、自己学習型AIチャットシステムにおけるUI共通仕様を定義する。画面初期表示、ユーザー操作、クライアント通信、および表示観点で必要なAPI依存を扱う。
 
-全体概要は [../../spec.md](../../spec.md)、APIの正本は [../api/common.md](../api/common.md) を参照する。
+全体概要は [../../spec.md](../../spec.md)、API サーバー責務は [../api/common.md](../api/common.md)、HTTP 契約の正本は [../api/openapi/openapi.yaml](../api/openapi/openapi.yaml) を参照する。
 
 ## 2. UIの責務
 
@@ -43,7 +43,7 @@ UIは、ユーザー向け画面の提供と、初期表示およびユーザー
 - 取得結果はレンダリング済みのHTMLとしてブラウザに返す
 - ローディング状態を極力排除する
 
-この初期取得で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `GET /api/chats` とする。
+この初期取得で利用する API 契約の正本は、[../api/openapi/openapi.yaml](../api/openapi/openapi.yaml) に定義された `GET /api/chats` とする。
 
 ## 5. UIのレイヤー構成
 
@@ -79,7 +79,7 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - メッセージ送信後は `last_messaged_at` と `channel_name` の更新に追従するため、チャット一覧データをリフレッシュする
 - 追加メッセージ送信を行った場合、`status = pending` の AI メッセージが存在する間は UI で入力を無効化し、API 側でも `422` により拒否される前提とする
 
-この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats` および `POST /api/chats/{channel_id}/messages` とする。
+この送信で利用する API 契約の正本は、[../api/openapi/openapi.yaml](../api/openapi/openapi.yaml) に定義された `POST /api/chats` および `POST /api/chats/{channel_id}/messages` とする。
 
 ## 7. 訂正送信
 
@@ -89,7 +89,7 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - UI は入力受付と結果表示を担う
 - バックエンドは `message_text` の意図を判定し、対象チャットの全履歴をもとに必要に応じて自己訂正とルール抽出を実行する
 
-この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats` および `POST /api/chats/{channel_id}/messages` とする。
+この送信で利用する API 契約の正本は、[../api/openapi/openapi.yaml](../api/openapi/openapi.yaml) に定義された `POST /api/chats` および `POST /api/chats/{channel_id}/messages` とする。
 
 ## 8. フィードバック送信
 
@@ -104,7 +104,7 @@ UI は、クリーンアーキテクチャに基づき以下の責務分離を�
 - 既存の評価と反対側のフィードバックを送信した場合は、その値へ更新する
 - 保存されたフィードバックは、以後の回答生成に利用される前提とする
 
-この送信で利用するAPIの正本は、[../api/common.md](../api/common.md) に定義された `POST /api/chats/{channel_id}/messages/{message_id}/feedback` とする。
+この送信で利用する API 契約の正本は、[../api/openapi/openapi.yaml](../api/openapi/openapi.yaml) に定義された `POST /api/chats/{channel_id}/messages/{message_id}/feedback` とする。
 
 ## 9. 認証画面の前提
 
