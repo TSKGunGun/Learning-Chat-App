@@ -1,0 +1,29 @@
+{
+  "name": "@learning-chat-app/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "tsc": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "cross-env TMPDIR=.tmp vitest run",
+    "generate:openapi-types": "openapi-typescript ../docs/specs/api/openapi/openapi.yaml -o ./src/generated/openapi-types.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.3",
+    "hono": "^4.12.21"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.1",
+    "cross-env": "^10.1.0",
+    "eslint": "^10.4.0",
+    "globals": "^17.6.0",
+    "openapi-typescript": "^7.13.0",
+    "tsc-alias": "^1.8.17",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.4",
+    "vitest": "^4.1.7"
+  }
+}

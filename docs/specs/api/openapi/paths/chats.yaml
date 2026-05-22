@@ -28,6 +28,12 @@ chats:
           application/json:
             schema:
               $ref: ../components/schemas.yaml#/ErrorResponse
+      '501':
+        description: スキャフォールド段階のため未実装
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
   post:
     tags:
       - Chats
@@ -66,8 +72,20 @@ chats:
           application/json:
             schema:
               $ref: ../components/schemas.yaml#/CreateChatResponse
+      '400':
+        description: "入力不備。`message_text` の欠落や path/request 形式不正。"
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
       '401':
         description: 未認証または認証切れ
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '501':
+        description: スキャフォールド段階のため未実装
         content:
           application/json:
             schema:
@@ -104,6 +122,12 @@ chatById:
           application/json:
             schema:
               $ref: ../components/schemas.yaml#/ChatDetailResponse
+      '400':
+        description: "入力不備。`channel_id` の形式不正。"
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
       '401':
         description: 未認証または認証切れ
         content:
@@ -112,6 +136,12 @@ chatById:
               $ref: ../components/schemas.yaml#/ErrorResponse
       '404':
         description: 存在しないチャンネル、削除済みチャンネル、または他ユーザー所有チャンネル
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '501':
+        description: スキャフォールド段階のため未実装
         content:
           application/json:
             schema:
@@ -143,6 +173,12 @@ chatById:
     responses:
       '204':
         description: 削除成功。レスポンスボディは返さない。
+      '400':
+        description: "入力不備。`channel_id` の形式不正。"
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
       '401':
         description: 未認証または認証切れ
         content:
@@ -151,6 +187,12 @@ chatById:
               $ref: ../components/schemas.yaml#/ErrorResponse
       '404':
         description: 存在しないチャンネル、削除済みチャンネル、または他ユーザー所有チャンネル
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '501':
+        description: スキャフォールド段階のため未実装
         content:
           application/json:
             schema:

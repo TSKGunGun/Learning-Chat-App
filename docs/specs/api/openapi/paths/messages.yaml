@@ -44,6 +44,12 @@ messages:
           application/json:
             schema:
               $ref: ../components/schemas.yaml#/SendMessageResponse
+      '400':
+        description: "入力不備。`channel_id` の形式不正、または `message_text` の欠落や不正形式。"
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
       '401':
         description: 未認証または認証切れ
         content:
@@ -58,6 +64,12 @@ messages:
               $ref: ../components/schemas.yaml#/ErrorResponse
       '422':
         description: 対象チャット内に pending の AI メッセージが存在するなど、業務条件に違反
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '501':
+        description: スキャフォールド段階のため未実装
         content:
           application/json:
             schema:
@@ -110,6 +122,12 @@ messageFeedback:
           application/json:
             schema:
               $ref: ../components/schemas.yaml#/FeedbackResponse
+      '400':
+        description: "入力不備。`channel_id` / `message_id` の形式不正、または `ai_feedback` の不正形式。"
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
       '401':
         description: 未認証または認証切れ
         content:
@@ -124,6 +142,12 @@ messageFeedback:
               $ref: ../components/schemas.yaml#/ErrorResponse
       '422':
         description: pending または ai_timeout の AI メッセージなど、業務条件に違反
+        content:
+          application/json:
+            schema:
+              $ref: ../components/schemas.yaml#/ErrorResponse
+      '501':
+        description: スキャフォールド段階のため未実装
         content:
           application/json:
             schema:
