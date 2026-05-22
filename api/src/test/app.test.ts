@@ -1,4 +1,4 @@
-import { app } from "@/framework/hono/app";
+import { app } from "@/app";
 import { OPENAPI_SOURCE_PATH } from "@/shared/contracts/openapi-source";
 
 const VALID_CHANNEL_ID = "22222222-2222-4222-8222-222222222222";
@@ -6,6 +6,10 @@ const VALID_MESSAGE_ID = "33333333-3333-4333-8333-333333333333";
 const AUTH_COOKIE = "session=scaffold-session";
 
 describe("API scaffold app", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("exposes the Hono app entrypoint", async () => {
     const response = await app.request("http://localhost/");
 
@@ -104,6 +108,22 @@ describe("API scaffold app", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       message: "ai_feedback must be a boolean.",
+    });
+  });
+
+  it("does not accept the scaffold session token in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    const response = await app.request("http://localhost/api/chats", {
+      method: "GET",
+      headers: {
+        cookie: AUTH_COOKIE,
+      },
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      message: "Authentication is required.",
     });
   });
 

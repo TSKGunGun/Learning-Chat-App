@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 
-import { app } from "@/framework/hono/app";
+import { app } from "@/app";
 
 const DEFAULT_PORT = 3000;
 
