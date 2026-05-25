@@ -1,4 +1,8 @@
-import { InMemorySessionGateway } from "@/gateways/in-memory-session-gateway";
+import { getRuntimeDatabase } from "@/db/client";
+import { getSessionTtlSeconds } from "@/db/env";
+import { BcryptPasswordHasher } from "@/gateways/bcrypt-password-hasher";
+import { DrizzleSessionGateway } from "@/gateways/drizzle-session-gateway";
+import { DrizzleUserGateway } from "@/gateways/drizzle-user-gateway";
 import type { SessionGateway } from "@/gateways/session-gateway";
 import { CreateChatWithFirstMessageUseCase } from "@/use-cases/create-chat-with-first-message-use-case";
 import { DeleteChatByIdUseCase } from "@/use-cases/delete-chat-by-id-use-case";
@@ -19,13 +23,27 @@ export interface AppComposition {
   readonly sendMessageFeedbackUseCase: SendMessageFeedbackUseCase;
 }
 
-export const createAppComposition = (): AppComposition => ({
-  sessionGateway: new InMemorySessionGateway(),
-  loginUseCase: new LoginUseCase(),
-  listChatsUseCase: new ListChatsUseCase(),
-  createChatUseCase: new CreateChatWithFirstMessageUseCase(),
-  getChatByIdUseCase: new GetChatByIdUseCase(),
-  deleteChatByIdUseCase: new DeleteChatByIdUseCase(),
-  sendMessageToChatUseCase: new SendMessageToChatUseCase(),
-  sendMessageFeedbackUseCase: new SendMessageFeedbackUseCase(),
-});
+export const createAppComposition = (): AppComposition => {
+  const database = getRuntimeDatabase();
+  const sessionGateway = new DrizzleSessionGateway(
+    database,
+    getSessionTtlSeconds()
+  );
+  const userGateway = new DrizzleUserGateway(database);
+  const passwordHasher = new BcryptPasswordHasher();
+
+  return {
+    sessionGateway,
+    loginUseCase: new LoginUseCase({
+      userGateway,
+      sessionGateway,
+      passwordHasher,
+    }),
+    listChatsUseCase: new ListChatsUseCase(),
+    createChatUseCase: new CreateChatWithFirstMessageUseCase(),
+    getChatByIdUseCase: new GetChatByIdUseCase(),
+    deleteChatByIdUseCase: new DeleteChatByIdUseCase(),
+    sendMessageToChatUseCase: new SendMessageToChatUseCase(),
+    sendMessageFeedbackUseCase: new SendMessageFeedbackUseCase(),
+  };
+};

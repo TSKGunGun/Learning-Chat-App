@@ -1,5 +1,6 @@
 import { setCookie } from "hono/cookie";
 
+import { getSessionTtlSeconds } from "@/db/env";
 import type { LoginUseCase } from "@/use-cases/login-use-case";
 import { honoFactory } from "@/hono-factory";
 import { presentLogin } from "@/presenters/auth-presenter";
@@ -25,6 +26,7 @@ export const createAuthRoutes = ({
 
     setCookie(context, response.cookie.name, response.cookie.value, {
       httpOnly: true,
+      maxAge: getSessionTtlSeconds(),
       path: "/",
       sameSite: "Lax",
       secure: process.env.NODE_ENV === "production",

@@ -1,3 +1,6 @@
+import type { PasswordHasher } from "@/gateways/password-hasher";
+import type { SessionGateway } from "@/gateways/session-gateway";
+import type { UserGateway } from "@/gateways/user-gateway";
 import { UnauthorizedError } from "@/shared/errors/application-error";
 
 export interface LoginCommand {
@@ -11,27 +14,43 @@ export interface LoginResult {
   readonly sessionToken: string;
 }
 
-const SCAFFOLD_USER = {
-  id: "11111111-1111-4111-8111-111111111111",
-  username: "scaffold-user",
-  password: "password",
-  sessionToken: "scaffold-session",
-} as const;
+interface LoginUseCaseDependencies {
+  readonly userGateway: UserGateway;
+  readonly sessionGateway: SessionGateway;
+  readonly passwordHasher: PasswordHasher;
+}
 
 export class LoginUseCase {
-  public async execute(command: LoginCommand): Promise<LoginResult> {
-    const isAuthenticated =
-      command.username === SCAFFOLD_USER.username &&
-      command.password === SCAFFOLD_USER.password;
+  public constructor(
+    private readonly dependencies: LoginUseCaseDependencies
+  ) {}
 
-    if (!isAuthenticated) {
-      throw new UnauthorizedError("ユーザー名またはパスワードが正しくありません。");
+  public async execute(command: LoginCommand): Promise<LoginResult> {
+    const userRecord = await this.dependencies.userGateway.findByUsername(
+      command.username
+    );
+
+    if (userRecord === null) {
+      throw new UnauthorizedError("Invalid username or password.");
     }
 
+    const isPasswordValid = await this.dependencies.passwordHasher.verify(
+      command.password,
+      userRecord.passwordHash
+    );
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedError("Invalid username or password.");
+    }
+
+    const sessionToken = await this.dependencies.sessionGateway.createSession(
+      userRecord.id
+    );
+
     return {
-      id: SCAFFOLD_USER.id,
-      username: SCAFFOLD_USER.username,
-      sessionToken: SCAFFOLD_USER.sessionToken,
+      id: userRecord.id,
+      username: userRecord.username,
+      sessionToken,
     };
   }
 }
