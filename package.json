@@ -1,0 +1,25 @@
+{
+  "name": "learning-chat-app",
+  "private": true,
+  "scripts": {
+    "generate:openapi-types:api": "npm run generate:openapi-types --prefix api",
+    "build:ui": "npm run build --prefix ui",
+    "build:api": "npm run build --prefix api",
+    "build": "npm run build:ui && npm run build:api",
+    "tsc:ui": "npm run tsc --prefix ui",
+    "tsc:api": "npm run tsc --prefix api",
+    "tsc": "npm run tsc:ui && npm run tsc:api",
+    "lint:ui": "npm run lint --prefix ui",
+    "lint:api": "npm run lint --prefix api",
+    "lint": "npm run lint:ui && npm run lint:api",
+    "test:ui": "npm run test --prefix ui",
+    "test:api": "npm run test --prefix api",
+    "test": "npm run test:ui && npm run test:api",
+    "check:ui": "npm run tsc:ui && npm run lint:ui && npm run test:ui && npm run build:ui",
+    "check:api": "npm run generate:openapi-types:api && npm run tsc:api && npm run lint:api && npm run test:api && npm run build:api",
+    "check": "npm run check:ui && npm run check:api",
+    "ci:ui": "npm run check:ui",
+    "ci:api": "npm run check:api",
+    "ci": "npm run check"
+  }
+}
