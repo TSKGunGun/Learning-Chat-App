@@ -3,6 +3,10 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
+const apiProxy = {
+  "/api": "http://localhost:3000",
+} as const;
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -11,9 +15,10 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: {
-      "/api": "http://localhost:3000",
-    },
+    proxy: apiProxy,
+  },
+  preview: {
+    proxy: apiProxy,
   },
   test: {
     environment: "jsdom",
