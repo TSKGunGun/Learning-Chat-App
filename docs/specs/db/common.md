@@ -8,8 +8,10 @@
 
 ## 2. DBの責務
 
-DBは、チャットチャンネル、チャット履歴、メッセージ評価、およびチャット全履歴の訂正から抽出されたルールデータを永続化し、回答生成時の類似ルール検索とフィードバック学習を支える。
+DBは、認証対象ユーザー、ログインセッション、チャットチャンネル、チャット履歴、メッセージ評価、およびチャット全履歴の訂正から抽出されたルールデータを永続化し、認証状態の継続と回答生成時の類似ルール検索・フィードバック学習を支える。
 
+- 認証対象ユーザーの保存
+- ログインセッションの保存
 - チャットチャンネルの保存
 - チャット履歴の保存
 - AI メッセージに対するフィードバック評価の保存
@@ -35,6 +37,21 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 
 パスワード平文は保持せず、保存対象はハッシュ値のみとする。
 ユーザー作成フローは今回の仕様範囲外とし、ユーザーは事前作成済みである前提とする。
+
+### `sessions` テーブル
+
+Cookie セッションと対応するサーバー側セッション情報を保持する。
+
+- `id` (UUID, Primary Key)
+- `user_id` (UUID, Foreign Key): セッション所有者のユーザー ID
+- `session_token_hash` (Text, Unique): Cookie に設定する生トークンをハッシュ化した値
+- `expires_at` (Timestamp): セッション有効期限
+- `created_at` (Timestamp)
+- `updated_at` (Timestamp)
+- `revoked_at` (Timestamp, Nullable): 明示的に無効化したセッションの失効日時
+
+Cookie には生トークンのみを保持し、DB にはハッシュ値のみを保存する。
+ログアウト API は今回の範囲外だが、サーバー側永続化を前提とし、`expires_at` を超過したセッション、または `revoked_at` が設定されたセッションは認証対象外とする。
 
 ### `chat_channels` テーブル
 
@@ -88,11 +105,14 @@ DBは、チャットチャンネル、チャット履歴、メッセージ評価
 バックエンドは以下のデータを管理する。
 
 - `users` テーブル: ログイン対象ユーザーの認証情報を保持する
+- `sessions` テーブル: Cookie セッションと対応するサーバー側認証状態を保持する
 - `chat_channels` テーブル: チャットチャンネルを保持する
 - `messages` テーブル: チャット履歴を保持する
 - `correction_rules` テーブル: 抽出済みルールと埋め込みベクトルを保持する
 
 `POST /api/auth/login` では `users` を認証対象として参照する。
+`POST /api/auth/login` の認証成功時は `sessions` を作成し、Cookie には対応する生トークンを設定する。
+認証必須 API では Cookie の `session` から得た生トークンを同一方式で hash 化し、`sessions.session_token_hash` と照合して認証済みユーザーを特定する。
 `GET /api/chats`、`POST /api/chats`、`GET /api/chats/{channel_id}`、`DELETE /api/chats/{channel_id}` では `chat_channels` をログイン済みユーザー単位で参照または更新する。
 `POST /api/chats` では、最初のユーザーメッセージ送信時に `chat_channels` を生成し、`is_deleted = false`、`channel_name`、`last_messaged_at` を設定する。
 `GET /api/chats/{channel_id}`、`POST /api/chats`、`POST /api/chats/{channel_id}/messages` では `messages` をチャット履歴として参照または追加する。

@@ -6,6 +6,7 @@ import type { EmbeddingGateway } from "@/gateways/embedding-gateway";
 import type { MessageGateway } from "@/gateways/message-gateway";
 import type { MessageListOptions, MessagePage } from "@/gateways/message-gateway";
 import type { PasswordHasher } from "@/gateways/password-hasher";
+import type { SessionGateway } from "@/gateways/session-gateway";
 import type { UserGateway } from "@/gateways/user-gateway";
 import type { ChatChannel } from "@/entities/chat-channel";
 import type { ChatMessage } from "@/entities/chat-message";
@@ -16,6 +17,24 @@ export class NoopUserGateway implements UserGateway {
     void _username;
 
     return null;
+  }
+}
+
+export class NoopSessionGateway implements SessionGateway {
+  public async createSession(_userId: string): Promise<string> {
+    void _userId;
+
+    throw new NotImplementedApplicationError(
+      "Session persistence is not implemented yet."
+    );
+  }
+
+  public async getAuthenticatedUser(_sessionToken: string): Promise<null> {
+    void _sessionToken;
+
+    throw new NotImplementedApplicationError(
+      "Session persistence is not implemented yet."
+    );
   }
 }
 

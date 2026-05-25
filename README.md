@@ -32,13 +32,17 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_PORT=5432
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/learning_chat_app
+SESSION_TTL_SECONDS=604800
+BCRYPT_SALT_ROUNDS=10
+SEED_DEV_USERNAME=dev-user
+SEED_DEV_PASSWORD=dev-password
 PORT=3000
 OPENAI_API_KEY=
 OPENAI_CHAT_MODEL=gpt-4o
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
-必要に応じて `.env` を編集し、ローカル環境に合わせて更新してください。`DATABASE_URL` と OpenAI 関連の値は、次工程の API 接続実装に向けたプレースホルダです。
+必要に応じて `.env` を編集し、ローカル環境に合わせて更新してください。`DATABASE_URL` は Drizzle migration / seed に加えて `api/` runtime でも参照します。`SESSION_TTL_SECONDS` はセッション Cookie の有効期限と DB 保存セッションの TTL に使います。`SEED_DEV_USERNAME` / `SEED_DEV_PASSWORD` は開発用初期ユーザー投入に使い、保存時は `BCRYPT_SALT_ROUNDS` を使って bcrypt hash に変換します。
 
 ### 2. PostgreSQL + pgvector を起動する
 
@@ -77,7 +81,19 @@ cd ../api
 npm install
 ```
 
-### 5. UI と API を起動する
+### 5. 認証用テーブルを作成し、開発用ユーザーを投入する
+
+`api/` では Drizzle schema と SQL migration を併用して `users` / `sessions` テーブルを管理します。
+
+```bash
+cd api
+npm run db:migrate
+npm run db:seed
+```
+
+`db:seed` は `.env` の `SEED_DEV_USERNAME` / `SEED_DEV_PASSWORD` を読み取り、平文ではなく `bcrypt` hash を `users.password_hash` に保存します。あわせて、そのユーザーに紐づく既存 `sessions` を削除して、開発環境の認証状態をリセットできるようにしています。
+
+### 6. UI と API を起動する
 
 未認証リダイレクトとログイン導線を確認するには、UI だけでなく API も同時に起動する必要があります。
 
@@ -99,15 +115,13 @@ npm run dev:ui
 
 ## 現在の API 実装状況
 
-`api/` はまだ scaffold 段階です。DB を起動しても、現在の API エンドポイント実装は既存どおり `501 Not Implemented` を返す前提です。
+`api/` はまだ一部 scaffold 段階です。今回の段階では Drizzle + PostgreSQL の永続化基盤、`users` / `sessions` テーブル、`POST /api/auth/login` の認証処理、認証必須 route の session 解決を実装しています。一方で chat / message の業務ロジックは既存どおり `501 Not Implemented` を返します。
 
 - OpenAPI を正本として型とルーティングの土台を管理しています
-- `401` や `400` の入力系検証は一部入っています
-- 業務ロジックや DB 永続化はまだ実装途中です
+- `401` や `400` の入力系検証に加えて、`POST /api/auth/login` は `users.password_hash` と `sessions` を使って動作します
+- chat / message の業務ロジックや対応テーブルの runtime 永続化はまだ実装途中です
 
-そのため、LBO-45 の DB 起動はローカル基盤の準備であり、現時点では API の scaffold 挙動自体は変わりません。
-
-`DATABASE_URL` は `.env.example` に追加されていますが、LBO-45 の段階では `api/` runtime からまだ参照していません。
+そのため、DB 起動後は `db:migrate` / `db:seed` で認証基盤を準備したうえで login 導線を確認できますが、chat / message 系 API は引き続き別工程です。
 
 ## API バリデーションコマンド
 
@@ -116,6 +130,8 @@ npm run dev:ui
 ```bash
 cd api
 npm run generate:openapi-types
+npm run db:migrate
+npm run db:seed
 npm run tsc
 npm run lint
 npm run build
@@ -123,6 +139,8 @@ npm run test
 ```
 
 `test` は `cross-env TMPDIR=.tmp vitest run` を実行します。
+
+`npm run db:generate` は `api/src/db/schema.ts` を更新したあとに migration を再生成するためのメンテナ用コマンドです。
 
 ## 関連ドキュメント
 

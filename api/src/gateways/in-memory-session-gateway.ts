@@ -9,6 +9,12 @@ const SCAFFOLD_USER: User = {
 const SCAFFOLD_SESSION_TOKEN = "scaffold-session";
 
 export class InMemorySessionGateway implements SessionGateway {
+  public async createSession(userId: string): Promise<string> {
+    void userId;
+
+    return SCAFFOLD_SESSION_TOKEN;
+  }
+
   public async getAuthenticatedUser(
     sessionToken: string
   ): Promise<User | null> {
