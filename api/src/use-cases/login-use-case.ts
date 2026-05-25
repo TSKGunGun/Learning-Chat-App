@@ -1,4 +1,4 @@
-import { NotImplementedApplicationError } from "@/shared/errors/application-error";
+import { UnauthorizedError } from "@/shared/errors/application-error";
 
 export interface LoginCommand {
   readonly username: string;
@@ -11,12 +11,27 @@ export interface LoginResult {
   readonly sessionToken: string;
 }
 
+const SCAFFOLD_USER = {
+  id: "11111111-1111-4111-8111-111111111111",
+  username: "scaffold-user",
+  password: "password",
+  sessionToken: "scaffold-session",
+} as const;
+
 export class LoginUseCase {
   public async execute(command: LoginCommand): Promise<LoginResult> {
-    void command;
+    const isAuthenticated =
+      command.username === SCAFFOLD_USER.username &&
+      command.password === SCAFFOLD_USER.password;
 
-    throw new NotImplementedApplicationError(
-      "POST /api/auth/login is not implemented yet."
-    );
+    if (!isAuthenticated) {
+      throw new UnauthorizedError("ユーザー名またはパスワードが正しくありません。");
+    }
+
+    return {
+      id: SCAFFOLD_USER.id,
+      username: SCAFFOLD_USER.username,
+      sessionToken: SCAFFOLD_USER.sessionToken,
+    };
   }
 }

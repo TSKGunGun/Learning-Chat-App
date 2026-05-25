@@ -19,7 +19,7 @@ describe("API scaffold app", () => {
     });
   });
 
-  it("returns 501 for the login scaffold endpoint", async () => {
+  it("logs in with the scaffold credentials", async () => {
     const response = await app.request("http://localhost/api/auth/login", {
       method: "POST",
       headers: {
@@ -31,9 +31,29 @@ describe("API scaffold app", () => {
       }),
     });
 
-    expect(response.status).toBe(501);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toContain(AUTH_COOKIE);
     await expect(response.json()).resolves.toEqual({
-      message: "POST /api/auth/login is not implemented yet.",
+      id: "11111111-1111-4111-8111-111111111111",
+      username: "scaffold-user",
+    });
+  });
+
+  it("returns 401 when the scaffold credentials do not match", async () => {
+    const response = await app.request("http://localhost/api/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "wrong-user",
+        password: "wrong-password",
+      }),
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      message: "ユーザー名またはパスワードが正しくありません。",
     });
   });
 

@@ -1,11 +1,22 @@
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
 
 import { AppRoutes } from "@/framework/routes/AppRoutes";
 
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
 describe("AppRoutes", () => {
   it("renders the top route placeholder", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 501 }))
+    );
+
     render(
       <MemoryRouter initialEntries={["/"]}>
         <AppRoutes />
@@ -14,7 +25,7 @@ describe("AppRoutes", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "自己学習型AIチャットのUIワークスペース",
+        name: "ChatApp",
       })
     ).toBeInTheDocument();
     expect(screen.getByText("新規チャットを開始")).toBeInTheDocument();
@@ -32,7 +43,9 @@ describe("AppRoutes", () => {
         name: "ログイン",
       })
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "ログインする" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/ユーザー名/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/パスワード/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ログインする" })).toBeDisabled();
   });
 
   it("renders the not found route for unknown paths", () => {

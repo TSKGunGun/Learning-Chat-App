@@ -17,10 +17,10 @@ export function AuthPageTemplate({
             {eyebrow}
           </p>
           <h1 className="mt-5 max-w-xl text-4xl font-semibold leading-tight sm:text-5xl">
-            UI とアプリケーション層の境界を守りながら、画面を増やせる土台。
+            ChatApp
           </h1>
           <p className="mt-4 max-w-lg text-base leading-7 text-muted-foreground">
-            このプレースホルダーは、認証導線の見た目と責務配置を確認するための最小画面です。
+            アカウントにログインして、会話を続けましょう。
           </p>
         </div>
         <div className="flex items-center justify-center">{children}</div>

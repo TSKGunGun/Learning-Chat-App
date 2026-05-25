@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import { ShieldCheck } from "lucide-react";
 
 import { Button } from "@/presentation/atoms/button";
@@ -7,13 +7,59 @@ import { Input } from "@/presentation/atoms/input";
 import { FormField } from "@/presentation/molecules/form-field";
 import type { LoginPageViewModel } from "@/interface-adapters/view-models/view-models";
 
-interface LoginFormPanelProps {
-  readonly viewModel: LoginPageViewModel;
+export interface LoginFormValues {
+  readonly username: string;
+  readonly password: string;
 }
 
-export function LoginFormPanel({ viewModel }: LoginFormPanelProps) {
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+interface LoginFormPanelProps {
+  readonly viewModel: LoginPageViewModel;
+  readonly isSubmitting?: boolean;
+  readonly errorMessage?: string;
+  readonly onSubmit?: (values: LoginFormValues) => void | Promise<void>;
+}
+
+function hasUsernameValue(username: string): boolean {
+  return username.trim().length > 0;
+}
+
+function hasPasswordValue(password: string): boolean {
+  return password.length > 0;
+}
+
+export function LoginFormPanel({
+  viewModel,
+  isSubmitting = false,
+  errorMessage,
+  onSubmit,
+}: LoginFormPanelProps) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const isSubmitDisabled =
+    isSubmitting || !hasUsernameValue(username) || !hasPasswordValue(password);
+
+  const handleUsernameChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setUsername(event.target.value);
+  };
+
+  const handlePasswordChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setPassword(event.target.value);
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (isSubmitDisabled) {
+      return;
+    }
+
+    const trimmedUsername = username.trim();
+
+    await onSubmit?.({
+      username: trimmedUsername,
+      password,
+    });
   };
 
   return (
@@ -39,6 +85,9 @@ export function LoginFormPanel({ viewModel }: LoginFormPanelProps) {
             name="username"
             placeholder={viewModel.usernamePlaceholder}
             autoComplete="username"
+            value={username}
+            onChange={handleUsernameChange}
+            disabled={isSubmitting}
           />
         </FormField>
 
@@ -53,11 +102,20 @@ export function LoginFormPanel({ viewModel }: LoginFormPanelProps) {
             type="password"
             placeholder={viewModel.passwordPlaceholder}
             autoComplete="current-password"
+            value={password}
+            onChange={handlePasswordChange}
+            disabled={isSubmitting}
           />
         </FormField>
 
-        <Button type="submit" className="mt-2">
-          {viewModel.submitLabel}
+        {errorMessage ? (
+          <p className="text-sm text-destructive" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
+
+        <Button type="submit" className="mt-2" disabled={isSubmitDisabled}>
+          {isSubmitting ? "送信中..." : viewModel.submitLabel}
         </Button>
       </form>
     </Card>

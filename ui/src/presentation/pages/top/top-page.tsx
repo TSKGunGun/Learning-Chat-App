@@ -22,12 +22,12 @@ export function TopPage({ viewModel }: TopPageProps) {
 export function TopLoadingPage() {
   return (
     <WorkspacePageTemplate
-      title="トップ画面を準備しています"
-      summary="画面構成と ViewModel のつなぎ込みを確認しています。"
+      title="トップ画面を読み込んでいます"
+      summary="会話一覧とチャット内容を準備しています。"
     >
       <RouteLoadingState
-        title="トップ画面のプレースホルダーを構築中です"
-        description="今後 API 取得へ置き換えてもルートの責務を保てるよう、非同期ロードの形を先に整えています。"
+        title="データを読み込んでいます"
+        description="表示できるまでしばらくお待ちください。"
       />
     </WorkspacePageTemplate>
   );
@@ -37,11 +37,11 @@ export function TopErrorPage() {
   return (
     <WorkspacePageTemplate
       title="トップ画面を読み込めませんでした"
-      summary="プレースホルダーの組み立て中に問題が発生しました。"
+      summary="時間をおいて再度お試しください。"
     >
       <RouteErrorState
-        title="トップ画面の初期化に失敗しました"
-        description="Controller から ViewModel を生成できなかったため、ワークスペースの雛形を表示できません。"
+        title="データの取得に失敗しました"
+        description="ネットワーク状況を確認してから再度お試しください。"
       />
     </WorkspacePageTemplate>
   );

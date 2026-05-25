@@ -16,7 +16,7 @@ export function WorkspacePageTemplate({
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <header className="max-w-3xl">
           <p className="text-sm font-medium uppercase tracking-[0.24em] text-secondary">
-            Vite + TypeScript Workspace
+            ChatApp
           </p>
           <h1 className="mt-4 text-4xl font-semibold leading-tight">{title}</h1>
           <p className="mt-4 text-base leading-7 text-muted-foreground">
