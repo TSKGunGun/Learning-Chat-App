@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "dev": "npm run build && npm run start",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node ./scripts/fix-dist-imports.mjs",
     "tsc": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "test": "cross-env TMPDIR=.tmp vitest run",

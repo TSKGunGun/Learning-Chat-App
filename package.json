@@ -2,6 +2,9 @@
   "name": "learning-chat-app",
   "private": true,
   "scripts": {
+    "dev:ui": "npm run dev --prefix ui",
+    "dev:api": "npm run dev --prefix api",
+    "dev": "bash -lc 'npm run dev:api & npm run dev:ui'",
     "generate:openapi-types:api": "npm run generate:openapi-types --prefix api",
     "build:ui": "npm run build --prefix ui",
     "build:api": "npm run build --prefix api",

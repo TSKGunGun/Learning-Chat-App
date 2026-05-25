@@ -77,6 +77,26 @@ cd ../api
 npm install
 ```
 
+### 5. UI と API を起動する
+
+未認証リダイレクトとログイン導線を確認するには、UI だけでなく API も同時に起動する必要があります。
+
+リポジトリルートで次を実行してください。
+
+```bash
+npm run dev
+```
+
+- UI: `http://localhost:5173`
+- API: `http://localhost:3000`
+
+個別に起動する場合は次を使います。
+
+```bash
+npm run dev:api
+npm run dev:ui
+```
+
 ## 現在の API 実装状況
 
 `api/` はまだ scaffold 段階です。DB を起動しても、現在の API エンドポイント実装は既存どおり `501 Not Implemented` を返す前提です。

@@ -1,27 +1,67 @@
+import { useState } from "react";
+
 import { LoginFormPanel } from "@/presentation/organisms/login-form-panel";
+import type { LoginFormValues } from "@/presentation/organisms/login-form-panel";
 import { RouteErrorState } from "@/presentation/organisms/route-error-state";
 import { RouteLoadingState } from "@/presentation/organisms/route-loading-state";
 import { AuthPageTemplate } from "@/presentation/templates/auth-page-template";
 import type { LoginPageViewModel } from "@/interface-adapters/view-models/view-models";
 
-interface LoginPageProps {
-  readonly viewModel: LoginPageViewModel;
+const DEFAULT_LOGIN_ERROR_MESSAGE =
+  "ユーザー名またはパスワードが正しくありません。";
+
+function resolveLoginErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.length > 0) {
+    return error.message;
+  }
+
+  return DEFAULT_LOGIN_ERROR_MESSAGE;
 }
 
-export function LoginPage({ viewModel }: LoginPageProps) {
+interface LoginPageProps {
+  readonly viewModel: LoginPageViewModel;
+  readonly onSubmit?: (values: LoginFormValues) => Promise<void> | void;
+}
+
+export function LoginPage({ viewModel, onSubmit }: LoginPageProps) {
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (values: LoginFormValues) => {
+    if (onSubmit === undefined) {
+      return;
+    }
+
+    setErrorMessage(undefined);
+    setIsSubmitting(true);
+
+    try {
+      await onSubmit(values);
+    } catch (error) {
+      setErrorMessage(resolveLoginErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <AuthPageTemplate eyebrow="Login Route Placeholder">
-      <LoginFormPanel viewModel={viewModel} />
+    <AuthPageTemplate eyebrow="Welcome Back">
+      <LoginFormPanel
+        viewModel={viewModel}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+        errorMessage={errorMessage}
+      />
     </AuthPageTemplate>
   );
 }
 
 export function LoginLoadingPage() {
   return (
-    <AuthPageTemplate eyebrow="Login Route Loading">
+    <AuthPageTemplate eyebrow="Sign In">
       <RouteLoadingState
-        title="ログイン画面のプレースホルダーを準備しています"
-        description="非同期ロード前提でも route から UI 層へ安全に値を渡せる形を整えています。"
+        title="ログイン画面を読み込んでいます"
+        description="まもなくログインフォームが表示されます。"
       />
     </AuthPageTemplate>
   );
@@ -29,10 +69,10 @@ export function LoginLoadingPage() {
 
 export function LoginErrorPage() {
   return (
-    <AuthPageTemplate eyebrow="Login Route Error">
+    <AuthPageTemplate eyebrow="Sign In">
       <RouteErrorState
-        title="ログイン画面の初期化に失敗しました"
-        description="認証プレースホルダーの ViewModel を組み立てられなかったため、安全なエラー表示へ切り替えています。"
+        title="ログイン画面を表示できませんでした"
+        description="時間をおいて再度お試しください。"
       />
     </AuthPageTemplate>
   );

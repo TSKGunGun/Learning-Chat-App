@@ -2,22 +2,34 @@ import { useEffect, useRef, useState } from "react";
 
 interface RouteLoaderResult<T> {
   readonly data: T | null;
+  readonly error: unknown;
   readonly hasError: boolean;
   readonly isLoading: boolean;
 }
 
+interface UseRouteLoaderOptions {
+  readonly shouldReportError?: (error: unknown) => boolean;
+}
+
 export function useRouteLoader<T>(
   loader: () => Promise<T>,
-  errorMessage: string
+  errorMessage: string,
+  options?: UseRouteLoaderOptions
 ): RouteLoaderResult<T> {
   const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const loaderRef = useRef(loader);
+  const shouldReportErrorRef = useRef(options?.shouldReportError);
 
   useEffect(() => {
     loaderRef.current = loader;
   }, [loader]);
+
+  useEffect(() => {
+    shouldReportErrorRef.current = options?.shouldReportError;
+  }, [options?.shouldReportError]);
 
   useEffect(() => {
     let isActive = true;
@@ -27,6 +39,7 @@ export function useRouteLoader<T>(
       setIsLoading(true);
 
       try {
+        setError(null);
         const nextData = await loaderRef.current();
 
         if (isActive) {
@@ -34,9 +47,12 @@ export function useRouteLoader<T>(
           setIsLoading(false);
         }
       } catch (error) {
-        console.error(errorMessage, error);
+        if (shouldReportErrorRef.current?.(error) ?? true) {
+          console.error(errorMessage, error);
+        }
 
         if (isActive) {
+          setError(error);
           setHasError(true);
           setIsLoading(false);
         }
@@ -52,6 +68,7 @@ export function useRouteLoader<T>(
 
   return {
     data,
+    error,
     hasError,
     isLoading,
   };

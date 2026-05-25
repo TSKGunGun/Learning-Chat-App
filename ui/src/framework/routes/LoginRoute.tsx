@@ -1,7 +1,9 @@
 import { useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { container } from "@/di/container";
 import { useRouteLoader } from "@/framework/hooks/use-route-loader";
+import { ROUTES } from "@/framework/routes/routes";
 import {
   LoginErrorPage,
   LoginLoadingPage,
@@ -9,9 +11,17 @@ import {
 } from "@/presentation/pages/login/login-page";
 
 export function LoginRoute() {
+  const navigate = useNavigate();
   const loadLoginPage = useCallback(
     () => container.loginPageController.handle(),
     []
+  );
+  const handleLogin = useCallback(
+    async (values: { username: string; password: string }) => {
+      await container.authenticationController.login(values);
+      navigate(ROUTES.top, { replace: true });
+    },
+    [navigate]
   );
   const { data: viewModel, hasError, isLoading } = useRouteLoader(
     loadLoginPage,
@@ -26,5 +36,5 @@ export function LoginRoute() {
     return <LoginLoadingPage />;
   }
 
-  return <LoginPage viewModel={viewModel} />;
+  return <LoginPage viewModel={viewModel} onSubmit={handleLogin} />;
 }

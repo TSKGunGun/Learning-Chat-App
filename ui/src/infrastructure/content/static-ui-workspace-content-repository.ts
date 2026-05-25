@@ -9,9 +9,9 @@ export class StaticUiWorkspaceContentRepository
 {
   public async getTopPagePreview(): Promise<TopPagePreview> {
     return {
-      heading: "自己学習型AIチャットのUIワークスペース",
+      heading: "ChatApp",
       supportingText:
-        "Atomic Design とクリーンアーキテクチャを両立する最小構成を、このプレースホルダーから育てていきます。",
+        "会話を選択するか、新しいチャットを開始して利用を続けてください。",
       primaryActionLabel: "新規チャットを開始",
       channels: [
         {
@@ -49,11 +49,11 @@ export class StaticUiWorkspaceContentRepository
     return {
       title: "ログイン",
       description:
-        "認証処理は未接続ですが、入力導線と画面責務の置き場はこの雛形で固定しています。",
+        "ユーザー名とパスワードを入力してログインしてください。",
       submitLabel: "ログインする",
       usernamePlaceholder: "ユーザー名",
       passwordPlaceholder: "パスワード",
-      helperText: "API 接続時は interface-adapters 経由で認証ユースケースへ接続します。",
+      helperText: "登録済みのアカウント情報を入力してください。",
     };
   }
 }
