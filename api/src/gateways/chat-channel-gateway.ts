@@ -1,8 +1,18 @@
 import type { ChatChannel } from "@/entities/chat-channel";
 
+export interface CreateChatChannelInput {
+  readonly id: string;
+  readonly userId: string;
+  readonly name: string;
+  readonly lastMessagedAt: string;
+}
+
 export interface ChatChannelGateway {
-  listByUserId(userId: string): Promise<ReadonlyArray<ChatChannel>>;
-  getById(channelId: string): Promise<ChatChannel | null>;
-  create(channel: ChatChannel): Promise<ChatChannel>;
-  deleteById(channelId: string): Promise<void>;
+  listActiveByUserId(userId: string): Promise<ReadonlyArray<ChatChannel>>;
+  findActiveOwnedById(
+    userId: string,
+    channelId: string
+  ): Promise<ChatChannel | null>;
+  create(channel: CreateChatChannelInput): Promise<ChatChannel>;
+  softDeleteOwnedById(userId: string, channelId: string): Promise<boolean>;
 }

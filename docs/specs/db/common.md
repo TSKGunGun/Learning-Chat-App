@@ -76,12 +76,12 @@ Cookie には生トークンのみを保持し、DB にはハッシュ値のみ�
 - `sender_type` (Text): `user` または `ai`
 - `message_text` (Text, Nullable): メッセージ本文。AI メッセージが `pending` の間は `null` を許容する
 - `status` (Text): 固定 enum。`pending`、`completed`、`ai_timeout` のみを許容する。`sender_type = user` の場合は常に `completed` を保持し、表示時に無視する。`sender_type = ai` の場合は応答生成状態として扱う
-- `ai_feedback` (Text, Nullable): AI 出力に対する評価。`good` または `bad` を保持し、ユーザー出力および `status = pending` の AI メッセージの場合は `null` とする
+- `ai_feedback` (Boolean, Nullable): AI 出力に対する評価。`true` は Good、`false` は Bad を表し、ユーザー出力および `status = pending` の AI メッセージの場合は `null` とする
 - `feedback_updated_at` (Timestamp, Nullable): AI メッセージに対するフィードバックの最終更新日時。ユーザー出力の場合は `null` とする
 - `created_at` (Timestamp)
 
 `messages` テーブルにより、1 つのチャットチャンネルに対して複数のメッセージ履歴を保持する。
-`ai_feedback` は AI メッセージに対する Good / Bad 評価を保持し、以後の回答生成時に学習シグナルとして参照する。nullを許容し、未評価時はnullとする。
+`ai_feedback` は AI メッセージに対する Good / Bad 評価を保持し、以後の回答生成時に学習シグナルとして参照する。`true` は Good、`false` は Bad を表す。nullを許容し、未評価時はnullとする。
 `status` は固定 enum とし、`pending`、`completed`、`ai_timeout` の 3 値のみを許容する。`sender_type = ai` かつ `status = pending` の間は回答本文未確定の状態とし、`status = completed` になった時点で `message_text` に回答本文を保持する。AI 応答生成開始から 60 秒以内に完了しない場合は `status = ai_timeout`、`message_text = AI応答がありません` とする。
 `sender_type = user` のメッセージは常に `status = completed` とする。
 `sender_type = ai` かつ `status = pending` のメッセージは、`ai_feedback = null` とする。

@@ -1,10 +1,12 @@
-import type { ChatChannelGateway } from "@/gateways/chat-channel-gateway";
+import type {
+  ChatChannelGateway,
+  CreateChatChannelInput,
+} from "@/gateways/chat-channel-gateway";
 import type { ChatCompletionGateway } from "@/gateways/chat-completion-gateway";
 import type { ChatCompletionRequest } from "@/gateways/chat-completion-gateway";
 import type { CorrectionRuleGateway } from "@/gateways/correction-rule-gateway";
 import type { EmbeddingGateway } from "@/gateways/embedding-gateway";
 import type { MessageGateway } from "@/gateways/message-gateway";
-import type { MessageListOptions, MessagePage } from "@/gateways/message-gateway";
 import type { PasswordHasher } from "@/gateways/password-hasher";
 import type { SessionGateway } from "@/gateways/session-gateway";
 import type { UserGateway } from "@/gateways/user-gateway";
@@ -39,7 +41,9 @@ export class NoopSessionGateway implements SessionGateway {
 }
 
 export class NoopChatChannelGateway implements ChatChannelGateway {
-  public async listByUserId(_userId: string): Promise<ReadonlyArray<never>> {
+  public async listActiveByUserId(
+    _userId: string
+  ): Promise<ReadonlyArray<never>> {
     void _userId;
 
     throw new NotImplementedApplicationError(
@@ -47,7 +51,11 @@ export class NoopChatChannelGateway implements ChatChannelGateway {
     );
   }
 
-  public async getById(_channelId: string): Promise<ChatChannel | null> {
+  public async findActiveOwnedById(
+    _userId: string,
+    _channelId: string
+  ): Promise<ChatChannel | null> {
+    void _userId;
     void _channelId;
 
     throw new NotImplementedApplicationError(
@@ -55,7 +63,9 @@ export class NoopChatChannelGateway implements ChatChannelGateway {
     );
   }
 
-  public async create(_channel: ChatChannel): Promise<ChatChannel> {
+  public async create(
+    _channel: CreateChatChannelInput
+  ): Promise<ChatChannel> {
     void _channel;
 
     throw new NotImplementedApplicationError(
@@ -63,7 +73,11 @@ export class NoopChatChannelGateway implements ChatChannelGateway {
     );
   }
 
-  public async deleteById(_channelId: string): Promise<void> {
+  public async softDeleteOwnedById(
+    _userId: string,
+    _channelId: string
+  ): Promise<boolean> {
+    void _userId;
     void _channelId;
 
     throw new NotImplementedApplicationError(
@@ -74,11 +88,21 @@ export class NoopChatChannelGateway implements ChatChannelGateway {
 
 export class NoopMessageGateway implements MessageGateway {
   public async listByChannelId(
-    _channelId: string,
-    _options?: MessageListOptions
-  ): Promise<MessagePage> {
+    _channelId: string
+  ): Promise<ReadonlyArray<ChatMessage>> {
     void _channelId;
-    void _options;
+
+    throw new NotImplementedApplicationError(
+      "Message persistence is not implemented yet."
+    );
+  }
+
+  public async listByActiveOwnedChannelId(
+    _userId: string,
+    _channelId: string
+  ): Promise<ReadonlyArray<ChatMessage>> {
+    void _userId;
+    void _channelId;
 
     throw new NotImplementedApplicationError(
       "Message persistence is not implemented yet."

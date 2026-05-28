@@ -14,10 +14,14 @@ export {
   loadEnvironment,
   requireEnvironmentVariable,
 } from "./env";
-export { sessions, users } from "./schema";
+export { chatChannels, messages, sessions, users } from "./schema";
 export type {
+  ChatChannelRecord,
+  MessageRecord,
   NewSessionRecord,
   NewUserRecord,
+  NewChatChannelRecord,
+  NewMessageRecord,
   SessionRecord,
   UserRecord,
 } from "./schema";

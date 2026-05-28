@@ -3,11 +3,14 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 import { loadEnvironment, requireEnvironmentVariable } from "./env";
-import { sessions, users } from "./schema";
+import { chatChannels, messages, sessions, users } from "./schema";
 
 loadEnvironment();
 
-export type Database = Pick<NodePgDatabase, "delete" | "insert" | "select">;
+export type Database = Pick<
+  NodePgDatabase,
+  "delete" | "insert" | "select" | "update"
+>;
 
 export interface DatabaseConnection {
   readonly pool: Pool;
@@ -15,6 +18,8 @@ export interface DatabaseConnection {
 }
 
 const schema = {
+  chatChannels,
+  messages,
   users,
   sessions,
 };
