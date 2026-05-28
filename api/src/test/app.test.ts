@@ -152,6 +152,11 @@ class TestSessionGateway implements SessionGateway {
 
 class TestChatChannelGateway implements ChatChannelGateway {
   public readonly deletedChannelIds: string[] = [];
+  public readonly lastMessagedAtUpdates: Array<{
+    readonly userId: string;
+    readonly channelId: string;
+    readonly lastMessagedAt: string;
+  }> = [];
 
   public constructor(private readonly channels: StoredChatChannel[]) {}
 
@@ -217,6 +222,35 @@ class TestChatChannelGateway implements ChatChannelGateway {
 
     this.deletedChannelIds.push(channelId);
     channel.isDeleted = true;
+
+    return true;
+  }
+
+  public async updateLastMessagedAtOwnedById(
+    userId: string,
+    channelId: string,
+    lastMessagedAt: string
+  ): Promise<boolean> {
+    const channelIndex = this.channels.findIndex(
+      (candidate) =>
+        candidate.userId === userId &&
+        candidate.id === channelId &&
+        !candidate.isDeleted
+    );
+
+    if (channelIndex === -1) {
+      return false;
+    }
+
+    this.lastMessagedAtUpdates.push({
+      userId,
+      channelId,
+      lastMessagedAt,
+    });
+    this.channels[channelIndex] = {
+      ...this.channels[channelIndex],
+      lastMessagedAt,
+    };
 
     return true;
   }
@@ -704,6 +738,9 @@ describe("API auth persistence", () => {
           };
         },
         async softDeleteOwnedById() {
+          return false;
+        },
+        async updateLastMessagedAtOwnedById() {
           return false;
         },
       },
