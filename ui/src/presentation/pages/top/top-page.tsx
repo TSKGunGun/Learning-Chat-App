@@ -6,15 +6,34 @@ import type { TopPageViewModel } from "@/interface-adapters/view-models/view-mod
 
 interface TopPageProps {
   readonly viewModel: TopPageViewModel;
+  readonly isBusy: boolean;
+  readonly onStartNewChat: () => void;
+  readonly onSelectChat: (channelId: string) => void;
+  readonly onDeleteChat: (channelId: string) => void;
+  readonly onDrawerOpenChange: (open: boolean) => void;
 }
 
-export function TopPage({ viewModel }: TopPageProps) {
+export function TopPage({
+  viewModel,
+  isBusy,
+  onStartNewChat,
+  onSelectChat,
+  onDeleteChat,
+  onDrawerOpenChange,
+}: TopPageProps) {
   return (
     <WorkspacePageTemplate
       title={viewModel.heading}
       summary={viewModel.supportingText}
     >
-      <ChatWorkspacePreview viewModel={viewModel} />
+      <ChatWorkspacePreview
+        viewModel={viewModel}
+        isBusy={isBusy}
+        onStartNewChat={onStartNewChat}
+        onSelectChat={onSelectChat}
+        onDeleteChat={onDeleteChat}
+        onDrawerOpenChange={onDrawerOpenChange}
+      />
     </WorkspacePageTemplate>
   );
 }

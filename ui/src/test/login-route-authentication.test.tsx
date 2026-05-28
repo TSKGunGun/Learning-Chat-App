@@ -69,7 +69,7 @@ describe("LoginRoute authentication flow", () => {
     );
     expect(
       await screen.findByRole("heading", {
-        name: "ChatApp",
+        name: "自己学習ルールの整理",
       })
     ).toBeInTheDocument();
   });
