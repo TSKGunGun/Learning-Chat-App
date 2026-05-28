@@ -3,7 +3,10 @@ import { and, asc, eq } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import { chatChannels, messages } from "@/db/schema";
 import type { ChatMessage } from "@/entities/chat-message";
-import type { MessageGateway } from "@/gateways/message-gateway";
+import type {
+  MessageGateway,
+  UpdateAiMessageInput,
+} from "@/gateways/message-gateway";
 
 const mapChatMessage = (record: {
   readonly id: string;
@@ -74,6 +77,24 @@ export class DrizzleMessageGateway implements MessageGateway {
     return rows.map(mapChatMessage);
   }
 
+  public async hasPendingAiMessageInChannel(channelId: string): Promise<boolean> {
+    const [pendingMessage] = await this.database
+      .select({
+        id: messages.id,
+      })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.channelId, channelId),
+          eq(messages.senderType, "ai"),
+          eq(messages.status, "pending")
+        )
+      )
+      .limit(1);
+
+    return pendingMessage !== undefined;
+  }
+
   public async createMessage(message: ChatMessage): Promise<ChatMessage> {
     const [createdMessage] = await this.database
       .insert(messages)
@@ -99,6 +120,19 @@ export class DrizzleMessageGateway implements MessageGateway {
       });
 
     return mapChatMessage(createdMessage);
+  }
+
+  public async updateAiMessage(
+    messageId: string,
+    input: UpdateAiMessageInput
+  ): Promise<void> {
+    await this.database
+      .update(messages)
+      .set({
+        status: input.status,
+        messageText: input.messageText,
+      })
+      .where(and(eq(messages.id, messageId), eq(messages.senderType, "ai")));
   }
 
   public async updateMessageFeedback(
