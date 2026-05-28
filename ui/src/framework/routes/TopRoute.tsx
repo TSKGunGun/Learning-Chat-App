@@ -1,8 +1,7 @@
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { container } from "@/di/container";
-import { useRouteLoader } from "@/framework/hooks/use-route-loader";
+import { useTopPageWorkspace } from "@/framework/hooks/use-top-page-workspace";
 import { ROUTES } from "@/framework/routes/routes";
 import {
   TopErrorPage,
@@ -13,18 +12,17 @@ import { UnauthorizedRequestError } from "@/shared/errors/request-errors";
 
 export function TopRoute() {
   const navigate = useNavigate();
-  const loadTopPage = useCallback(async () => {
-    await container.authenticationController.requireAuthenticatedSession();
-    return container.topPageController.handle();
-  }, []);
-  const { data: viewModel, error, hasError, isLoading } = useRouteLoader(
-    loadTopPage,
-    "Failed to load the top page placeholder.",
-    {
-      shouldReportError: (routeError) =>
-        !(routeError instanceof UnauthorizedRequestError),
-    }
-  );
+  const {
+    viewModel,
+    error,
+    hasError,
+    isLoading,
+    isPending,
+    startNewChat,
+    selectChat,
+    deleteChat,
+    setDrawerOpen,
+  } = useTopPageWorkspace();
 
   useEffect(() => {
     if (error instanceof UnauthorizedRequestError) {
@@ -44,5 +42,14 @@ export function TopRoute() {
     return <TopLoadingPage />;
   }
 
-  return <TopPage viewModel={viewModel} />;
+  return (
+    <TopPage
+      viewModel={viewModel}
+      isBusy={isPending}
+      onStartNewChat={startNewChat}
+      onSelectChat={selectChat}
+      onDeleteChat={deleteChat}
+      onDrawerOpenChange={setDrawerOpen}
+    />
+  );
 }
