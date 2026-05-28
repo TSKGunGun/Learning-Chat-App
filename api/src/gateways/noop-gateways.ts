@@ -84,6 +84,20 @@ export class NoopChatChannelGateway implements ChatChannelGateway {
       "Chat channel persistence is not implemented yet."
     );
   }
+
+  public async updateLastMessagedAtOwnedById(
+    _userId: string,
+    _channelId: string,
+    _lastMessagedAt: string
+  ): Promise<boolean> {
+    void _userId;
+    void _channelId;
+    void _lastMessagedAt;
+
+    throw new NotImplementedApplicationError(
+      "Chat channel persistence is not implemented yet."
+    );
+  }
 }
 
 export class NoopMessageGateway implements MessageGateway {

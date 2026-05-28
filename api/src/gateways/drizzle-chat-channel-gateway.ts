@@ -1,4 +1,4 @@
-import { and, desc, eq, exists, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import type { Database } from "@/db/client";
 import { chatChannels, messages } from "@/db/schema";
@@ -19,12 +19,43 @@ const mapChatChannel = (record: {
   lastMessagedAt: record.lastMessagedAt.toISOString(),
 });
 
+const iso8601DateTimePattern =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
+
+const parseLastMessagedAt = (lastMessagedAtValue: string): Date => {
+  if (!iso8601DateTimePattern.test(lastMessagedAtValue)) {
+    throw new ApplicationError(
+      "lastMessagedAt must be a valid ISO 8601 datetime.",
+      400
+    );
+  }
+
+  const lastMessagedAt = new Date(lastMessagedAtValue);
+
+  if (Number.isNaN(lastMessagedAt.getTime())) {
+    throw new ApplicationError(
+      "lastMessagedAt must be a valid ISO 8601 datetime.",
+      400
+    );
+  }
+
+  return lastMessagedAt;
+};
+
 export class DrizzleChatChannelGateway implements ChatChannelGateway {
   public constructor(private readonly database: Database) {}
 
   public async listActiveByUserId(
     userId: string
   ): Promise<ReadonlyArray<ChatChannel>> {
+    const messageChannels = this.database
+      .select({
+        channelId: messages.channelId,
+      })
+      .from(messages)
+      .groupBy(messages.channelId)
+      .as("message_channels");
+
     const rows = await this.database
       .select({
         id: chatChannels.id,
@@ -32,16 +63,11 @@ export class DrizzleChatChannelGateway implements ChatChannelGateway {
         lastMessagedAt: chatChannels.lastMessagedAt,
       })
       .from(chatChannels)
+      .innerJoin(messageChannels, eq(messageChannels.channelId, chatChannels.id))
       .where(
         and(
           eq(chatChannels.userId, userId),
-          eq(chatChannels.isDeleted, false),
-          exists(
-            this.database
-              .select({ value: sql`1` })
-              .from(messages)
-              .where(eq(messages.channelId, chatChannels.id))
-          )
+          eq(chatChannels.isDeleted, false)
         )
       )
       .orderBy(desc(chatChannels.lastMessagedAt));
@@ -74,14 +100,7 @@ export class DrizzleChatChannelGateway implements ChatChannelGateway {
 
   public async create(channel: CreateChatChannelInput): Promise<ChatChannel> {
     const now = new Date();
-    const lastMessagedAt = new Date(channel.lastMessagedAt);
-
-    if (Number.isNaN(lastMessagedAt.getTime())) {
-      throw new ApplicationError(
-        "lastMessagedAt must be a valid ISO 8601 datetime.",
-        400
-      );
-    }
+    const lastMessagedAt = parseLastMessagedAt(channel.lastMessagedAt);
 
     const [createdChannel] = await this.database
       .insert(chatChannels)
@@ -123,5 +142,30 @@ export class DrizzleChatChannelGateway implements ChatChannelGateway {
       .returning({ id: chatChannels.id });
 
     return deletedChannels.length > 0;
+  }
+
+  public async updateLastMessagedAtOwnedById(
+    userId: string,
+    channelId: string,
+    lastMessagedAtValue: string
+  ): Promise<boolean> {
+    const lastMessagedAt = parseLastMessagedAt(lastMessagedAtValue);
+
+    const updatedChannels = await this.database
+      .update(chatChannels)
+      .set({
+        lastMessagedAt,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(chatChannels.id, channelId),
+          eq(chatChannels.userId, userId),
+          eq(chatChannels.isDeleted, false)
+        )
+      )
+      .returning({ id: chatChannels.id });
+
+    return updatedChannels.length > 0;
   }
 }

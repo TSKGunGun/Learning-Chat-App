@@ -15,4 +15,9 @@ export interface ChatChannelGateway {
   ): Promise<ChatChannel | null>;
   create(channel: CreateChatChannelInput): Promise<ChatChannel>;
   softDeleteOwnedById(userId: string, channelId: string): Promise<boolean>;
+  updateLastMessagedAtOwnedById(
+    userId: string,
+    channelId: string,
+    lastMessagedAt: string
+  ): Promise<boolean>;
 }
