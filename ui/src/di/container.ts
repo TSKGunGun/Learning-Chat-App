@@ -6,7 +6,7 @@ import { LoadTopPageWorkspaceUseCase } from "@/application/use-cases/load-top-pa
 import { LoginWithCredentialsUseCase } from "@/application/use-cases/login-with-credentials-use-case";
 import { RequireAuthenticatedSessionUseCase } from "@/application/use-cases/require-authenticated-session-use-case";
 import { HttpAuthenticationRepository } from "@/infrastructure/auth/http-authentication-repository";
-import { InMemoryChatWorkspaceRepository } from "@/infrastructure/chat/in-memory-chat-workspace-repository";
+import { HttpChatWorkspaceRepository } from "@/infrastructure/chat/http-chat-workspace-repository";
 import { StaticUiWorkspaceContentRepository } from "@/infrastructure/content/static-ui-workspace-content-repository";
 import { AuthenticationController } from "@/interface-adapters/controllers/authentication-controller";
 import { LoginPageController } from "@/interface-adapters/controllers/login-page-controller";
@@ -15,7 +15,7 @@ import { LoginPagePresenter } from "@/interface-adapters/presenters/login-page-p
 import { TopPagePresenter } from "@/interface-adapters/presenters/top-page-presenter";
 
 const uiContentRepository = new StaticUiWorkspaceContentRepository();
-const chatWorkspaceRepository = new InMemoryChatWorkspaceRepository();
+const chatWorkspaceRepository = new HttpChatWorkspaceRepository();
 const authenticationRepository = new HttpAuthenticationRepository();
 
 export const container = {

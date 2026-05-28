@@ -32,11 +32,42 @@ describe("LoginRoute authentication flow", () => {
       )
       .mockResolvedValueOnce(
         new Response(
+          JSON.stringify([]),
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json",
+            },
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              channel_id: "channel-1",
+              channel_name: "自己学習ルールの整理",
+              last_messaged_at: "2026-05-28T09:45:00.000Z",
+            },
+          ]),
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json",
+            },
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
           JSON.stringify({
-            message: "GET /api/chats is not implemented yet.",
+            channel_id: "channel-1",
+            channel_name: "自己学習ルールの整理",
+            last_messaged_at: "2026-05-28T09:45:00.000Z",
+            messages: [],
           }),
           {
-            status: 501,
+            status: 200,
             headers: {
               "content-type": "application/json",
             },

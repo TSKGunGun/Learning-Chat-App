@@ -7,6 +7,14 @@ import type { TopPageWorkspaceState } from "@/application/use-cases/load-top-pag
 import { container } from "@/di/container";
 import { AppRoutes } from "@/framework/routes/AppRoutes";
 
+const createJsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json",
+    },
+  });
+
 const createWorkspace = (
   overrides: Partial<TopPageWorkspaceState> = {}
 ): TopPageWorkspaceState => ({
@@ -50,10 +58,42 @@ describe("TopRoute workspace behavior", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows the most recent chat from the real in-memory workspace by default", async () => {
+  it("loads the most recent chat from the API by default", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(null, { status: 501 }))
+      vi
+        .fn()
+        .mockResolvedValueOnce(createJsonResponse([]))
+        .mockResolvedValueOnce(
+          createJsonResponse([
+            {
+              channel_id: "channel-1",
+              channel_name: "自己学習ルールの整理",
+              last_messaged_at: "2026-05-28T09:45:00.000Z",
+            },
+            {
+              channel_id: "channel-2",
+              channel_name: "トップ画面 2 ペイン構成",
+              last_messaged_at: "2026-05-27T12:15:00.000Z",
+            },
+          ])
+        )
+        .mockResolvedValueOnce(
+          createJsonResponse({
+            channel_id: "channel-1",
+            channel_name: "自己学習ルールの整理",
+            last_messaged_at: "2026-05-28T09:45:00.000Z",
+            messages: [
+              {
+                message_id: "message-1",
+                sender_type: "user",
+                message_text: "訂正ルールの見直し観点を整理したいです。",
+                status: "completed",
+                ai_feedback: null,
+              },
+            ],
+          })
+        )
     );
 
     render(
@@ -64,6 +104,91 @@ describe("TopRoute workspace behavior", () => {
 
     expect(
       await screen.findByRole("heading", { name: "自己学習ルールの整理" })
+    ).toBeInTheDocument();
+  });
+
+  it("loads chat detail from the API when selecting another chat", async () => {
+    const user = userEvent.setup();
+
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(createJsonResponse([]))
+        .mockResolvedValueOnce(
+          createJsonResponse([
+            {
+              channel_id: "channel-1",
+              channel_name: "自己学習ルールの整理",
+              last_messaged_at: "2026-05-28T09:45:00.000Z",
+            },
+            {
+              channel_id: "channel-2",
+              channel_name: "トップ画面 2 ペイン構成",
+              last_messaged_at: "2026-05-27T12:15:00.000Z",
+            },
+          ])
+        )
+        .mockResolvedValueOnce(
+          createJsonResponse({
+            channel_id: "channel-1",
+            channel_name: "自己学習ルールの整理",
+            last_messaged_at: "2026-05-28T09:45:00.000Z",
+            messages: [],
+          })
+        )
+        .mockResolvedValueOnce(
+          createJsonResponse({
+            channel_id: "channel-2",
+            channel_name: "トップ画面 2 ペイン構成",
+            last_messaged_at: "2026-05-27T12:15:00.000Z",
+            messages: [
+              {
+                message_id: "message-2",
+                sender_type: "ai",
+                message_text:
+                  "一覧操作を優先しつつ、モバイルではドロワー型サイドバーへ切り替えます。",
+                status: "completed",
+                ai_feedback: false,
+              },
+            ],
+          })
+        )
+        .mockResolvedValueOnce(
+          createJsonResponse([
+            {
+              channel_id: "channel-1",
+              channel_name: "自己学習ルールの整理",
+              last_messaged_at: "2026-05-28T09:45:00.000Z",
+            },
+            {
+              channel_id: "channel-2",
+              channel_name: "トップ画面 2 ペイン構成",
+              last_messaged_at: "2026-05-27T12:15:00.000Z",
+            },
+          ])
+        )
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppRoutes />
+      </MemoryRouter>
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "自己学習ルールの整理" })
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByText("トップ画面 2 ペイン構成"));
+
+    expect(
+      await screen.findByRole("heading", { name: "トップ画面 2 ペイン構成" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "一覧操作を優先しつつ、モバイルではドロワー型サイドバーへ切り替えます。"
+      )
     ).toBeInTheDocument();
   });
 

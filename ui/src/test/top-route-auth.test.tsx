@@ -6,7 +6,7 @@ import { AppRoutes } from "@/framework/routes/AppRoutes";
 
 const createJsonResponse = (
   status: number,
-  body: Record<string, string>,
+  body: unknown,
   contentType = "application/json"
 ) =>
   new Response(JSON.stringify(body), {
@@ -46,14 +46,29 @@ describe("TopRoute authentication guard", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the top page shell when the session is accepted", async () => {
+  it("renders API-backed chat content when the session is accepted", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        createJsonResponse(501, {
-          message: "GET /api/chats is not implemented yet.",
-        })
-      )
+      vi
+        .fn()
+        .mockResolvedValueOnce(createJsonResponse(200, []))
+        .mockResolvedValueOnce(
+          createJsonResponse(200, [
+            {
+              channel_id: "channel-1",
+              channel_name: "自己学習ルールの整理",
+              last_messaged_at: "2026-05-28T09:45:00.000Z",
+            },
+          ])
+        )
+        .mockResolvedValueOnce(
+          createJsonResponse(200, {
+            channel_id: "channel-1",
+            channel_name: "自己学習ルールの整理",
+            last_messaged_at: "2026-05-28T09:45:00.000Z",
+            messages: [],
+          })
+        )
     );
 
     render(
@@ -64,7 +79,7 @@ describe("TopRoute authentication guard", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "ChatApp",
+        name: "自己学習ルールの整理",
       })
     ).toBeInTheDocument();
   });
