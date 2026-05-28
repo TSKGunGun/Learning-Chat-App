@@ -72,8 +72,10 @@ export class CreateChatWithFirstMessageUseCase {
     }
 
     const createdAt = this.clock.now().toISOString();
+    const pendingCreatedAt = this.clock.now().toISOString();
     const channelId = this.idGenerator.generate();
     const messageId = this.idGenerator.generate();
+    const pendingMessageId = this.idGenerator.generate();
     const channelName =
       await this.channelNameGeneratorGateway.generateChannelName({
         firstMessageText: command.messageText,
@@ -86,18 +88,31 @@ export class CreateChatWithFirstMessageUseCase {
       name: channelName,
       lastMessagedAt: createdAt,
     });
-    await this.messageGateway.createMessage({
-      id: messageId,
+    await this.messageGateway.appendUserMessageWithPendingAiMessage({
       channelId,
-      senderType: "user",
-      messageText: command.messageText,
-      status: "completed",
-      aiFeedback: null,
-      createdAt,
+      userMessage: {
+        id: messageId,
+        channelId,
+        senderType: "user",
+        messageText: command.messageText,
+        status: "completed",
+        aiFeedback: null,
+        createdAt,
+      },
+      pendingAiMessage: {
+        id: pendingMessageId,
+        channelId,
+        senderType: "ai",
+        messageText: null,
+        status: "pending",
+        aiFeedback: null,
+        createdAt: pendingCreatedAt,
+      },
     });
     await this.aiReplyLifecycleService.start({
       authenticatedUserId: command.authenticatedUserId,
       channelId,
+      pendingMessageId,
     });
 
     return {

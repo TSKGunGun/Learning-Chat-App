@@ -11,6 +11,8 @@ import type { ChatCompletionRequest } from "@/gateways/chat-completion-gateway";
 import type { CorrectionRuleGateway } from "@/gateways/correction-rule-gateway";
 import type { EmbeddingGateway } from "@/gateways/embedding-gateway";
 import type {
+  AppendedChatMessages,
+  AppendUserMessageWithPendingAiMessageInput,
   MessageGateway,
   UpdateAiMessageInput,
 } from "@/gateways/message-gateway";
@@ -130,8 +132,10 @@ export class NoopMessageGateway implements MessageGateway {
     );
   }
 
-  public async hasPendingAiMessageInChannel(_channelId: string): Promise<boolean> {
-    void _channelId;
+  public async appendUserMessageWithPendingAiMessage(
+    _input: AppendUserMessageWithPendingAiMessageInput
+  ): Promise<AppendedChatMessages> {
+    void _input;
 
     throw new NotImplementedApplicationError(
       "Message persistence is not implemented yet."

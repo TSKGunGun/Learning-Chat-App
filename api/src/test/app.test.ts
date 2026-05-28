@@ -34,6 +34,7 @@ import { SendMessageToChatUseCase } from "@/use-cases/send-message-to-chat-use-c
 import { AiReplyLifecycleService } from "@/services/ai-reply-lifecycle-service";
 import type { Clock } from "@/shared/clock";
 import type { IdGenerator } from "@/shared/id-generator";
+import { PendingAiMessageAlreadyExistsError } from "@/shared/errors/application-error";
 
 const VALID_CHANNEL_ID = "22222222-2222-4222-8222-222222222222";
 const VALID_MESSAGE_ID = "33333333-3333-4333-8333-333333333333";
@@ -190,6 +191,21 @@ class TestChatChannelGateway implements ChatChannelGateway {
     };
   }
 
+  public setLastMessagedAt(channelId: string, lastMessagedAt: string): void {
+    const channelIndex = this.channels.findIndex(
+      (candidate) => candidate.id === channelId
+    );
+
+    if (channelIndex === -1) {
+      return;
+    }
+
+    this.channels[channelIndex] = {
+      ...this.channels[channelIndex],
+      lastMessagedAt,
+    };
+  }
+
   public async listActiveByUserId(
     userId: string
   ): Promise<ReadonlyArray<ChatChannel>> {
@@ -296,7 +312,8 @@ class TestMessageGateway implements MessageGateway {
   }> = [];
 
   public constructor(
-    private readonly messagesByChannelId: Map<string, ChatMessage[]>
+    private readonly messagesByChannelId: Map<string, ChatMessage[]>,
+    private readonly chatChannelGateway: TestChatChannelGateway
   ) {}
 
   public async listByChannelId(
@@ -316,13 +333,6 @@ class TestMessageGateway implements MessageGateway {
     return this.listByChannelId(channelId);
   }
 
-  public async hasPendingAiMessageInChannel(channelId: string): Promise<boolean> {
-    return (this.messagesByChannelId.get(channelId) ?? []).some(
-      (message) =>
-        message.senderType === "ai" && message.status === "pending"
-    );
-  }
-
   public async createMessage(message: ChatMessage): Promise<ChatMessage> {
     this.createdMessages.push(message);
     const existingMessages = this.messagesByChannelId.get(message.channelId) ?? [];
@@ -331,6 +341,41 @@ class TestMessageGateway implements MessageGateway {
     this.messagesByChannelId.set(message.channelId, existingMessages);
 
     return message;
+  }
+
+  public async appendUserMessageWithPendingAiMessage(input: {
+    readonly channelId: string;
+    readonly userMessage: ChatMessage;
+    readonly pendingAiMessage: ChatMessage;
+  }): Promise<{
+    readonly userMessage: ChatMessage;
+    readonly pendingAiMessage: ChatMessage;
+  }> {
+    const existingMessages = this.messagesByChannelId.get(input.channelId) ?? [];
+    const hasPendingAiMessage = existingMessages.some(
+      (message) =>
+        message.senderType === "ai" && message.status === "pending"
+    );
+
+    if (hasPendingAiMessage) {
+      throw new PendingAiMessageAlreadyExistsError();
+    }
+
+    this.createdMessages.push(input.userMessage, input.pendingAiMessage);
+    this.messagesByChannelId.set(input.channelId, [
+      ...existingMessages,
+      input.userMessage,
+      input.pendingAiMessage,
+    ]);
+    this.chatChannelGateway.setLastMessagedAt(
+      input.channelId,
+      input.pendingAiMessage.createdAt
+    );
+
+    return {
+      userMessage: input.userMessage,
+      pendingAiMessage: input.pendingAiMessage,
+    };
   }
 
   public async updateAiMessage(
@@ -351,6 +396,10 @@ class TestMessageGateway implements MessageGateway {
         status: input.status,
         messageText: input.messageText,
       });
+      this.chatChannelGateway.setLastMessagedAt(
+        input.channelId,
+        input.lastMessagedAt
+      );
       this.messagesByChannelId.set(channelId, [
         ...channelMessages.slice(0, messageIndex),
         {
@@ -606,6 +655,8 @@ const createChatSliceTestContext = (): ChatSliceTestContext => {
         ],
       ],
     ])
+    ,
+    chatChannelGateway
   );
 
   return {
@@ -673,7 +724,10 @@ const createMessageFlowTestContext = ({
   readonly messagesByChannelId?: Map<string, ChatMessage[]>;
 } = {}): MessageFlowTestContext => {
   const chatChannelGateway = new TestChatChannelGateway([...channels]);
-  const messageGateway = new TestMessageGateway(messagesByChannelId);
+  const messageGateway = new TestMessageGateway(
+    messagesByChannelId,
+    chatChannelGateway
+  );
   const clock = new SequenceClock([...clockValues]);
   const idGenerator = new StubIdGenerator([...generatedIds]);
   const chatCompletionGateway = new TestChatCompletionGateway(replyFactory);
@@ -681,11 +735,9 @@ const createMessageFlowTestContext = ({
     channelName
   );
   const aiReplyLifecycleService = new AiReplyLifecycleService({
-    chatChannelGateway,
     messageGateway,
     chatCompletionGateway,
     clock,
-    idGenerator,
   });
 
   return {
@@ -1356,18 +1408,6 @@ describe("API auth persistence", () => {
         lastMessagedAt: "2026-05-29T00:00:00.000Z",
       },
     ]);
-    expect(chatChannelGateway.lastMessagedAtUpdates).toEqual([
-      {
-        userId: TEST_USER_ID,
-        channelId: "10101010-1010-4010-8010-101010101010",
-        lastMessagedAt: "2026-05-29T00:00:01.000Z",
-      },
-      {
-        userId: TEST_USER_ID,
-        channelId: "10101010-1010-4010-8010-101010101010",
-        lastMessagedAt: "2026-05-29T00:00:02.000Z",
-      },
-    ]);
     expect(chatCompletionGateway.calls).toHaveLength(1);
     expect(chatCompletionGateway.calls[0]?.conversationHistory).toEqual([
       {
@@ -1400,6 +1440,16 @@ describe("API auth persistence", () => {
         createdAt: "2026-05-29T00:00:01.000Z",
       },
     ]);
+    await expect(
+      chatChannelGateway.findActiveOwnedById(
+        TEST_USER_ID,
+        "10101010-1010-4010-8010-101010101010"
+      )
+    ).resolves.toEqual({
+      id: "10101010-1010-4010-8010-101010101010",
+      name: "AI要約タイトル",
+      lastMessagedAt: "2026-05-29T00:00:02.000Z",
+    });
   });
 
   it("sends a message to an existing chat and updates the pending message to completed", async () => {
@@ -1449,24 +1499,6 @@ describe("API auth persistence", () => {
 
     await flushMicrotasks();
 
-    expect(chatChannelGateway.lastMessagedAtUpdates).toEqual([
-      {
-        userId: TEST_USER_ID,
-        channelId: VALID_CHANNEL_ID,
-        lastMessagedAt: "2026-05-29T01:00:00.000Z",
-      },
-      {
-        userId: TEST_USER_ID,
-        channelId: VALID_CHANNEL_ID,
-        lastMessagedAt: "2026-05-29T01:00:01.000Z",
-      },
-      {
-        userId: TEST_USER_ID,
-        channelId: VALID_CHANNEL_ID,
-        lastMessagedAt: "2026-05-29T01:00:02.000Z",
-      },
-    ]);
-
     const storedMessages = await messageGateway.listByChannelId(VALID_CHANNEL_ID);
 
     expect(storedMessages).toEqual([
@@ -1498,6 +1530,13 @@ describe("API auth persistence", () => {
         createdAt: "2026-05-29T01:00:01.000Z",
       },
     ]);
+    await expect(
+      chatChannelGateway.findActiveOwnedById(TEST_USER_ID, VALID_CHANNEL_ID)
+    ).resolves.toEqual({
+      id: VALID_CHANNEL_ID,
+      name: "Project Kickoff",
+      lastMessagedAt: "2026-05-29T01:00:02.000Z",
+    });
   });
 
   it("returns 422 when an existing chat already has a pending AI response", async () => {
@@ -1769,23 +1808,13 @@ describe("API auth persistence", () => {
           createdAt: "2026-05-29T02:00:01.000Z",
         },
       ]);
-      expect(chatChannelGateway.lastMessagedAtUpdates).toEqual([
-        {
-          userId: TEST_USER_ID,
-          channelId: VALID_CHANNEL_ID,
-          lastMessagedAt: "2026-05-29T02:00:00.000Z",
-        },
-        {
-          userId: TEST_USER_ID,
-          channelId: VALID_CHANNEL_ID,
-          lastMessagedAt: "2026-05-29T02:00:01.000Z",
-        },
-        {
-          userId: TEST_USER_ID,
-          channelId: VALID_CHANNEL_ID,
-          lastMessagedAt: "2026-05-29T02:01:00.000Z",
-        },
-      ]);
+      await expect(
+        chatChannelGateway.findActiveOwnedById(TEST_USER_ID, VALID_CHANNEL_ID)
+      ).resolves.toEqual({
+        id: VALID_CHANNEL_ID,
+        name: "Project Kickoff",
+        lastMessagedAt: "2026-05-29T02:01:00.000Z",
+      });
     } finally {
       vi.useRealTimers();
     }

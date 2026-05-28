@@ -1,26 +1,18 @@
 import type { ChatMessage } from "@/entities/chat-message";
-import type { ChatChannelGateway } from "@/gateways/chat-channel-gateway";
 import type { ChatCompletionGateway } from "@/gateways/chat-completion-gateway";
 import type { MessageGateway } from "@/gateways/message-gateway";
 import type { Clock } from "@/shared/clock";
-import type { IdGenerator } from "@/shared/id-generator";
 
 export interface StartAiReplyLifecycleCommand {
   readonly authenticatedUserId: string;
   readonly channelId: string;
-}
-
-interface PendingAiMessageSnapshot {
-  readonly id: string;
-  readonly createdAt: string;
+  readonly pendingMessageId: string;
 }
 
 interface AiReplyLifecycleServiceDependencies {
-  readonly chatChannelGateway: ChatChannelGateway;
   readonly messageGateway: MessageGateway;
   readonly chatCompletionGateway: ChatCompletionGateway;
   readonly clock: Clock;
-  readonly idGenerator: IdGenerator;
   readonly timeoutMilliseconds?: number;
 }
 
@@ -59,43 +51,13 @@ export class AiReplyLifecycleService {
     const conversationHistory = await this.dependencies.messageGateway.listByChannelId(
       command.channelId
     );
-    const pendingMessage = await this.createPendingMessage(command.channelId);
-
-    await this.updateChannelLastMessagedAt(
-      command.authenticatedUserId,
-      command.channelId,
-      pendingMessage.createdAt
-    );
 
     void this.completeReply({
       ...command,
-      pendingMessageId: pendingMessage.id,
       conversationHistory,
     }).catch((error: unknown) => {
       console.error(error);
     });
-  }
-
-  private async createPendingMessage(
-    channelId: string
-  ): Promise<PendingAiMessageSnapshot> {
-    const createdAt = this.dependencies.clock.now().toISOString();
-    const pendingMessageId = this.dependencies.idGenerator.generate();
-
-    await this.dependencies.messageGateway.createMessage({
-      id: pendingMessageId,
-      channelId,
-      senderType: "ai",
-      messageText: null,
-      status: "pending",
-      aiFeedback: null,
-      createdAt,
-    });
-
-    return {
-      id: pendingMessageId,
-      createdAt,
-    };
   }
 
   private async completeReply(command: {
@@ -135,31 +97,16 @@ export class AiReplyLifecycleService {
         await this.dependencies.messageGateway.updateAiMessage(
           command.pendingMessageId,
           {
+            channelId: command.channelId,
             status: "completed",
             messageText: completedReply,
+            lastMessagedAt: completedAt,
           }
         );
       } catch {
         await this.markTimedOut(command);
 
         return;
-      }
-
-      try {
-        await this.updateChannelLastMessagedAt(
-          command.authenticatedUserId,
-          command.channelId,
-          completedAt
-        );
-      } catch (error: unknown) {
-        console.error(
-          "Failed to update channel lastMessagedAt after AI completion.",
-          {
-            error,
-            authenticatedUserId: command.authenticatedUserId,
-            channelId: command.channelId,
-          }
-        );
       }
     } catch {
       timeout.cancel();
@@ -195,34 +142,10 @@ export class AiReplyLifecycleService {
     const timedOutAt = this.dependencies.clock.now().toISOString();
 
     await this.dependencies.messageGateway.updateAiMessage(command.pendingMessageId, {
+      channelId: command.channelId,
       status: "ai_timeout",
       messageText: AI_TIMEOUT_MESSAGE,
+      lastMessagedAt: timedOutAt,
     });
-
-    try {
-      await this.updateChannelLastMessagedAt(
-        command.authenticatedUserId,
-        command.channelId,
-        timedOutAt
-      );
-    } catch (error: unknown) {
-      console.error("Failed to update channel lastMessagedAt after timeout.", {
-        error,
-        authenticatedUserId: command.authenticatedUserId,
-        channelId: command.channelId,
-      });
-    }
-  }
-
-  private async updateChannelLastMessagedAt(
-    authenticatedUserId: string,
-    channelId: string,
-    lastMessagedAt: string
-  ): Promise<void> {
-    await this.dependencies.chatChannelGateway.updateLastMessagedAtOwnedById(
-      authenticatedUserId,
-      channelId,
-      lastMessagedAt
-    );
   }
 }

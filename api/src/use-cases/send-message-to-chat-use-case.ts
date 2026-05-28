@@ -76,33 +76,36 @@ export class SendMessageToChatUseCase {
       throw new NotFoundApplicationError("Chat channel not found.");
     }
 
-    const hasPendingAiMessage =
-      await this.messageGateway.hasPendingAiMessageInChannel(command.channelId);
-
-    if (hasPendingAiMessage) {
-      throw new ApplicationError("Pending AI response already exists.", 422);
-    }
-
     const createdAt = this.clock.now().toISOString();
+    const pendingCreatedAt = this.clock.now().toISOString();
     const messageId = this.idGenerator.generate();
+    const pendingMessageId = this.idGenerator.generate();
 
-    await this.messageGateway.createMessage({
-      id: messageId,
+    await this.messageGateway.appendUserMessageWithPendingAiMessage({
       channelId: command.channelId,
-      senderType: "user",
-      messageText: command.messageText,
-      status: "completed",
-      aiFeedback: null,
-      createdAt,
+      userMessage: {
+        id: messageId,
+        channelId: command.channelId,
+        senderType: "user",
+        messageText: command.messageText,
+        status: "completed",
+        aiFeedback: null,
+        createdAt,
+      },
+      pendingAiMessage: {
+        id: pendingMessageId,
+        channelId: command.channelId,
+        senderType: "ai",
+        messageText: null,
+        status: "pending",
+        aiFeedback: null,
+        createdAt: pendingCreatedAt,
+      },
     });
-    await this.chatChannelGateway.updateLastMessagedAtOwnedById(
-      command.authenticatedUserId,
-      command.channelId,
-      createdAt
-    );
     await this.aiReplyLifecycleService.start({
       authenticatedUserId: command.authenticatedUserId,
       channelId: command.channelId,
+      pendingMessageId,
     });
 
     return {

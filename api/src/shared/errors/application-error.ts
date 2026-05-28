@@ -22,6 +22,12 @@ export class NotFoundApplicationError extends ApplicationError {
   }
 }
 
+export class PendingAiMessageAlreadyExistsError extends ApplicationError {
+  public constructor(message = "Pending AI response already exists.") {
+    super(message, 422);
+  }
+}
+
 export class NotImplementedApplicationError extends ApplicationError {
   public constructor(message: string) {
     super(message, 501);

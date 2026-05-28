@@ -76,7 +76,7 @@ const createTestDatabase = (): Database => {
       messages,
       users,
     },
-  }) as Database;
+  }) as unknown as Database;
 };
 
 const insertUser = async (database: Database, id: string, username: string) => {

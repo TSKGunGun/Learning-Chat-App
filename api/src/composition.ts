@@ -47,11 +47,9 @@ export const createAppComposition = (): AppComposition => {
     chatCompletionGateway,
   });
   const aiReplyLifecycleService = new AiReplyLifecycleService({
-    chatChannelGateway,
     messageGateway,
     chatCompletionGateway,
     clock,
-    idGenerator,
   });
 
   return {

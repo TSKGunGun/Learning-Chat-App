@@ -7,22 +7,22 @@ import { chatChannels, messages, sessions, users } from "./schema";
 
 loadEnvironment();
 
-export type Database = Pick<
-  NodePgDatabase,
-  "delete" | "insert" | "select" | "update"
->;
-
-export interface DatabaseConnection {
-  readonly pool: Pool;
-  readonly database: Database;
-}
-
 const schema = {
   chatChannels,
   messages,
   users,
   sessions,
 };
+
+export type Database = Pick<
+  NodePgDatabase<typeof schema>,
+  "delete" | "insert" | "select" | "transaction" | "update"
+>;
+
+export interface DatabaseConnection {
+  readonly pool: Pool;
+  readonly database: Database;
+}
 
 export const createDatabasePool = (
   connectionString = requireEnvironmentVariable("DATABASE_URL")
