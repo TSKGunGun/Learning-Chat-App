@@ -16,6 +16,12 @@ export class UnauthorizedError extends ApplicationError {
   }
 }
 
+export class NotFoundApplicationError extends ApplicationError {
+  public constructor(message = "Resource not found.") {
+    super(message, 404);
+  }
+}
+
 export class NotImplementedApplicationError extends ApplicationError {
   public constructor(message: string) {
     super(message, 501);

@@ -1,6 +1,8 @@
 import { getRuntimeDatabase } from "@/db/client";
 import { getSessionTtlSeconds } from "@/db/env";
 import { BcryptPasswordHasher } from "@/gateways/bcrypt-password-hasher";
+import { DrizzleChatChannelGateway } from "@/gateways/drizzle-chat-channel-gateway";
+import { DrizzleMessageGateway } from "@/gateways/drizzle-message-gateway";
 import { DrizzleSessionGateway } from "@/gateways/drizzle-session-gateway";
 import { DrizzleUserGateway } from "@/gateways/drizzle-user-gateway";
 import type { SessionGateway } from "@/gateways/session-gateway";
@@ -31,6 +33,8 @@ export const createAppComposition = (): AppComposition => {
   );
   const userGateway = new DrizzleUserGateway(database);
   const passwordHasher = new BcryptPasswordHasher();
+  const chatChannelGateway = new DrizzleChatChannelGateway(database);
+  const messageGateway = new DrizzleMessageGateway(database);
 
   return {
     sessionGateway,
@@ -39,10 +43,17 @@ export const createAppComposition = (): AppComposition => {
       sessionGateway,
       passwordHasher,
     }),
-    listChatsUseCase: new ListChatsUseCase(),
+    listChatsUseCase: new ListChatsUseCase({
+      chatChannelGateway,
+    }),
     createChatUseCase: new CreateChatWithFirstMessageUseCase(),
-    getChatByIdUseCase: new GetChatByIdUseCase(),
-    deleteChatByIdUseCase: new DeleteChatByIdUseCase(),
+    getChatByIdUseCase: new GetChatByIdUseCase({
+      chatChannelGateway,
+      messageGateway,
+    }),
+    deleteChatByIdUseCase: new DeleteChatByIdUseCase({
+      chatChannelGateway,
+    }),
     sendMessageToChatUseCase: new SendMessageToChatUseCase(),
     sendMessageFeedbackUseCase: new SendMessageFeedbackUseCase(),
   };
