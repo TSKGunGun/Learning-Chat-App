@@ -27,21 +27,21 @@ export function SidebarChannelItem({
   return (
     <Card
       className={cn(
-        "rounded-2xl border p-2",
+        "w-full min-w-0 max-w-full overflow-hidden rounded-2xl border p-2",
         channel.isSelected ? "border-primary/40 bg-primary/5" : "bg-white/70"
       )}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex min-w-0 w-full max-w-full items-start gap-2 overflow-hidden">
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-start gap-3 rounded-[1.15rem] px-3 py-2 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex min-w-0 flex-1 items-start gap-3 overflow-hidden rounded-[1.15rem] px-3 py-2 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onClick={() => onSelect(channel.channelId)}
           disabled={disabled}
         >
-          <span className="rounded-xl bg-accent/20 p-2 text-accent-foreground">
+          <span className="shrink-0 rounded-xl bg-accent/20 p-2 text-accent-foreground">
             <MessageSquare className="h-4 w-4" aria-hidden="true" />
           </span>
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1 overflow-hidden">
             <span className="block truncate text-sm font-semibold">
               {channel.channelName}
             </span>
