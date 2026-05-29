@@ -22,8 +22,10 @@ export interface TopPageSidebarViewModel {
 }
 
 export interface TopPageComposerViewModel {
+  readonly value: string;
   readonly inputPlaceholder: string;
   readonly submitLabel: string;
+  readonly errorMessage: string | null;
   readonly isInputDisabled: boolean;
   readonly isSubmitDisabled: boolean;
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { ChatWorkspaceRepository } from "@/application/ports/chat-workspace-repository";
+import type {
+  ChatWorkspaceRepository,
+  SubmittedUserMessage,
+} from "@/application/ports/chat-workspace-repository";
 import { LoadTopPageWorkspaceUseCase } from "@/application/use-cases/load-top-page-workspace-use-case";
 import {
   resolveChatSelectionAfterDelete,
@@ -15,6 +18,14 @@ class EmptyChatWorkspaceRepository implements ChatWorkspaceRepository {
   }
 
   public async getChatById(): Promise<ChatDetail> {
+    throw new Error("not implemented");
+  }
+
+  public async createChatWithFirstMessage(): Promise<SubmittedUserMessage> {
+    throw new Error("not implemented");
+  }
+
+  public async sendMessageToChat(): Promise<SubmittedUserMessage> {
     throw new Error("not implemented");
   }
 
@@ -34,6 +45,14 @@ class FlakyChatWorkspaceRepository implements ChatWorkspaceRepository {
 
   public async getChatById(): Promise<ChatDetail> {
     throw new Error("not found");
+  }
+
+  public async createChatWithFirstMessage(): Promise<SubmittedUserMessage> {
+    throw new Error("not implemented");
+  }
+
+  public async sendMessageToChat(): Promise<SubmittedUserMessage> {
+    throw new Error("not implemented");
   }
 
   public async deleteChatById(): Promise<void> {}

@@ -50,25 +50,31 @@ describe("TopRoute authentication guard", () => {
     vi.stubGlobal(
       "fetch",
       vi
-        .fn()
-        .mockResolvedValueOnce(createJsonResponse(200, []))
-        .mockResolvedValueOnce(
-          createJsonResponse(200, [
-            {
+        .fn(async (input, init) => {
+          const url = typeof input === "string" ? input : input.url;
+          const method = init?.method ?? "GET";
+
+          if (method === "GET" && url === "/api/chats") {
+            return createJsonResponse(200, [
+              {
+                channel_id: "channel-1",
+                channel_name: "自己学習ルールの整理",
+                last_messaged_at: "2026-05-28T09:45:00.000Z",
+              },
+            ]);
+          }
+
+          if (method === "GET" && url === "/api/chats/channel-1") {
+            return createJsonResponse(200, {
               channel_id: "channel-1",
               channel_name: "自己学習ルールの整理",
               last_messaged_at: "2026-05-28T09:45:00.000Z",
-            },
-          ])
-        )
-        .mockResolvedValueOnce(
-          createJsonResponse(200, {
-            channel_id: "channel-1",
-            channel_name: "自己学習ルールの整理",
-            last_messaged_at: "2026-05-28T09:45:00.000Z",
-            messages: [],
-          })
-        )
+              messages: [],
+            });
+          }
+
+          throw new Error(`Unhandled request: ${method} ${url}`);
+        })
     );
 
     render(

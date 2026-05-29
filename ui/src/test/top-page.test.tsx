@@ -47,8 +47,10 @@ function createViewModel(
         },
       ],
       composer: {
+        value: "",
         inputPlaceholder: "メッセージを入力",
         submitLabel: "送信",
+        errorMessage: null,
         isInputDisabled: false,
         isSubmitDisabled: true,
       },
@@ -74,14 +76,26 @@ describe("TopPage", () => {
     const handleStartNewChat = vi.fn();
     const handleSelectChat = vi.fn();
     const handleDeleteChat = vi.fn();
+    const handleComposerTextChange = vi.fn();
+    const handleMessageSubmit = vi.fn();
 
     render(
       <TopPage
-        viewModel={createViewModel()}
+        viewModel={createViewModel({
+          activePane: {
+            ...createViewModel().activePane,
+            composer: {
+              ...createViewModel().activePane.composer,
+              isSubmitDisabled: false,
+            },
+          },
+        })}
         isBusy={false}
         onStartNewChat={handleStartNewChat}
         onSelectChat={handleSelectChat}
         onDeleteChat={handleDeleteChat}
+        onComposerTextChange={handleComposerTextChange}
+        onMessageSubmit={handleMessageSubmit}
         onDrawerOpenChange={vi.fn()}
       />
     );
@@ -91,10 +105,14 @@ describe("TopPage", () => {
     await user.click(
       screen.getAllByRole("button", { name: "週次ふり返りを削除" })[0]
     );
+    await user.type(screen.getByRole("textbox", { name: "メッセージ入力" }), "次の一手");
+    await user.click(screen.getByRole("button", { name: "送信" }));
 
     expect(handleStartNewChat).toHaveBeenCalledTimes(1);
     expect(handleSelectChat).toHaveBeenCalledWith("channel-2");
     expect(handleDeleteChat).toHaveBeenCalledWith("channel-1");
+    expect(handleComposerTextChange).toHaveBeenCalled();
+    expect(handleMessageSubmit).toHaveBeenCalledTimes(1);
   });
 
   it("renders the draft pane empty state", () => {
@@ -108,8 +126,10 @@ describe("TopPage", () => {
             emptyStateText: "ここから新しい会話を始められます。",
             messages: [],
             composer: {
+              value: "",
               inputPlaceholder: "メッセージを入力",
               submitLabel: "送信",
+              errorMessage: null,
               isInputDisabled: false,
               isSubmitDisabled: true,
             },
@@ -119,6 +139,8 @@ describe("TopPage", () => {
         onStartNewChat={vi.fn()}
         onSelectChat={vi.fn()}
         onDeleteChat={vi.fn()}
+        onComposerTextChange={vi.fn()}
+        onMessageSubmit={vi.fn()}
         onDrawerOpenChange={vi.fn()}
       />
     );
@@ -129,5 +151,50 @@ describe("TopPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "メッセージ入力" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "送信" })).toBeDisabled();
+  });
+
+  it("shows the inline composer error and disables input while pending", () => {
+    render(
+      <TopPage
+        viewModel={createViewModel({
+          activePane: {
+            title: "AI 応答待ちの確認",
+            description: "ポーリング中の表示です。",
+            isDraft: false,
+            emptyStateText: "まだメッセージはありません。",
+            messages: [
+              {
+                id: "pending-message",
+                authorLabel: "AI",
+                body: "AI回答生成中",
+                statusLabel: "AI回答生成中",
+                feedbackAvailable: false,
+              },
+            ],
+            composer: {
+              value: "送信待ちメッセージ",
+              inputPlaceholder: "メッセージを入力",
+              submitLabel: "送信",
+              errorMessage: "Pending AI response already exists.",
+              isInputDisabled: true,
+              isSubmitDisabled: true,
+            },
+          },
+        })}
+        isBusy={false}
+        onStartNewChat={vi.fn()}
+        onSelectChat={vi.fn()}
+        onDeleteChat={vi.fn()}
+        onComposerTextChange={vi.fn()}
+        onMessageSubmit={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("textbox", { name: "メッセージ入力" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "送信" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Pending AI response already exists."
+    );
   });
 });

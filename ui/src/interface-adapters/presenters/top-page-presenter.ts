@@ -1,5 +1,6 @@
 import type { TopPageWorkspaceState } from "@/application/use-cases/load-top-page-workspace-use-case";
 import type { ChatSelection } from "@/application/use-cases/top-page-workspace-selection";
+import type { ChatDetail } from "@/entities/chat/chat-detail";
 import type { MessageStatus } from "@/entities/chat/chat-message";
 import type { TopPageViewModel } from "@/interface-adapters/view-models/view-models";
 
@@ -34,15 +35,26 @@ const resolvePaneDescription = (selection: ChatSelection) =>
     ? "最初のメッセージを送信するまでは未保存の新規チャットとして扱われます。"
     : "会話履歴を確認しながら、次の実装方針を整理できます。";
 
+const hasPendingAiMessage = (chatDetail: ChatDetail | null): boolean =>
+  (chatDetail?.messages ?? []).some(
+    (message) => message.senderType === "ai" && message.status === "pending"
+  );
+
 export class TopPagePresenter {
   public present(
     workspace: TopPageWorkspaceState,
-    isDrawerOpen: boolean
+    options: {
+      readonly composerText: string;
+      readonly composerErrorMessage: string | null;
+      readonly isDrawerOpen: boolean;
+      readonly isSubmittingMessage: boolean;
+    }
   ): TopPageViewModel {
     const selectedChannelId =
       workspace.selection.type === "existing"
         ? workspace.selection.channelId
         : null;
+    const hasPendingMessage = hasPendingAiMessage(workspace.activeChat);
     const activeTitle =
       workspace.selection.type === "new"
         ? "新規チャット"
@@ -81,15 +93,20 @@ export class TopPagePresenter {
             message.senderType === "ai" && message.status === "completed",
         })),
         composer: {
+          value: options.composerText,
           inputPlaceholder: "メッセージを入力",
-          submitLabel: "送信",
-          isInputDisabled: false,
-          isSubmitDisabled: true,
+          submitLabel: options.isSubmittingMessage ? "送信中..." : "送信",
+          errorMessage: options.composerErrorMessage,
+          isInputDisabled: options.isSubmittingMessage || hasPendingMessage,
+          isSubmitDisabled:
+            options.isSubmittingMessage ||
+            hasPendingMessage ||
+            options.composerText.trim().length === 0,
         },
       },
       mobileDrawer: {
         canOpenDrawer: true,
-        isDrawerOpen,
+        isDrawerOpen: options.isDrawerOpen,
         openLabel: "チャット一覧を開く",
         closeLabel: "チャット一覧を閉じる",
         title: "チャット一覧",
