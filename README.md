@@ -31,6 +31,9 @@ POSTGRES_DB=learning_chat_app
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_PORT=5432
+PGADMIN_PORT=5050
+PGADMIN_DEFAULT_EMAIL=admin@example.com
+PGADMIN_DEFAULT_PASSWORD=admin
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/learning_chat_app
 SESSION_TTL_SECONDS=604800
 BCRYPT_SALT_ROUNDS=10
@@ -44,7 +47,7 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 
 必要に応じて `.env` を編集し、ローカル環境に合わせて更新してください。`DATABASE_URL` は Drizzle migration / seed に加えて `api/` runtime でも参照します。`SESSION_TTL_SECONDS` はセッション Cookie の有効期限と DB 保存セッションの TTL に使います。`SEED_DEV_USERNAME` / `SEED_DEV_PASSWORD` は開発用初期ユーザー投入に使い、保存時は `BCRYPT_SALT_ROUNDS` を使って bcrypt hash に変換します。
 
-### 2. PostgreSQL + pgvector を起動する
+### 2. PostgreSQL + pgvector + PGAdmin を起動する
 
 ```bash
 docker compose config
@@ -58,9 +61,15 @@ docker compose ps
 docker compose down
 ```
 
+起動後は次の URL から PGAdmin にアクセスできます。
+
+- PGAdmin: `http://localhost:5050`
+
+ログインには `.env` の `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` を使います。ログイン後は `Learning Chat App Local` があらかじめ表示されるので、接続時に `.env` の `POSTGRES_PASSWORD` を入力してください。
+
 ### 3. pgvector を確認する
 
-`docker compose up -d` 実行後、`docker compose ps` で `db` サービスが起動していることを確認してから、`pgvector` 拡張が有効かを確認します。
+`docker compose up -d` 実行後、`docker compose ps` で `db` と `pgadmin` サービスが起動していることを確認してから、`pgvector` 拡張が有効かを確認します。
 
 ```bash
 docker compose exec db sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
@@ -68,7 +77,7 @@ docker compose exec db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SE
 docker compose exec db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT '\''[1,2,3]'\''::vector <-> '\''[1,2,4]'\''::vector;"'
 ```
 
-`vector` 拡張が表示され、距離計算の SQL が実行できれば `pgvector` の確認は完了です。
+`vector` 拡張が表示され、距離計算の SQL が実行できれば `pgvector` の確認は完了です。GUI から確認する場合は PGAdmin の Query Tool で `SELECT extname FROM pg_extension WHERE extname = 'vector';` を実行してください。
 
 ### 4. パッケージをセットアップする
 

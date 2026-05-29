@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Learning Chat App Local",
+      "Group": "Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "learning_chat_app",
+      "Username": "postgres",
+      "SSLMode": "prefer"
+    }
+  }
+}
