@@ -8,12 +8,19 @@ import type {
 } from "@/gateways/channel-name-generator-gateway";
 import type { ChatCompletionGateway } from "@/gateways/chat-completion-gateway";
 import type { ChatCompletionRequest } from "@/gateways/chat-completion-gateway";
+import type {
+  AnalyzeCorrectionConversationInput,
+  CorrectionAnalysisGateway,
+  CorrectionAnalysisResult,
+} from "@/gateways/correction-analysis-gateway";
 import type { CorrectionRuleGateway } from "@/gateways/correction-rule-gateway";
 import type { EmbeddingGateway } from "@/gateways/embedding-gateway";
 import type {
+  AiFeedbackExample,
   AppendedChatMessages,
   AppendUserMessageWithPendingAiMessageInput,
   MessageGateway,
+  OwnedAiMessageForFeedback,
   UpdateAiMessageInput,
 } from "@/gateways/message-gateway";
 import type { PasswordHasher } from "@/gateways/password-hasher";
@@ -173,6 +180,32 @@ export class NoopMessageGateway implements MessageGateway {
       "Message persistence is not implemented yet."
     );
   }
+
+  public async findOwnedAiMessageForFeedback(
+    _userId: string,
+    _channelId: string,
+    _messageId: string
+  ): Promise<OwnedAiMessageForFeedback | null> {
+    void _userId;
+    void _channelId;
+    void _messageId;
+
+    throw new NotImplementedApplicationError(
+      "Message persistence is not implemented yet."
+    );
+  }
+
+  public async listFeedbackExamplesByUserId(
+    _userId: string,
+    _limit: number
+  ): Promise<ReadonlyArray<AiFeedbackExample>> {
+    void _userId;
+    void _limit;
+
+    throw new NotImplementedApplicationError(
+      "Message persistence is not implemented yet."
+    );
+  }
 }
 
 export class NoopChannelNameGeneratorGateway
@@ -190,10 +223,29 @@ export class NoopChannelNameGeneratorGateway
 }
 
 export class NoopCorrectionRuleGateway implements CorrectionRuleGateway {
-  public async findRelevantRulesByChannelId(
-    _channelId: string
-  ): Promise<ReadonlyArray<string>> {
-    void _channelId;
+  public async saveRules(
+    _rules: ReadonlyArray<{
+      readonly id: string;
+      readonly channelId: string;
+      readonly triggerMessageId: string;
+      readonly ruleText: string;
+      readonly embedding: ReadonlyArray<number>;
+      readonly createdAt: string;
+    }>
+  ): Promise<void> {
+    void _rules;
+
+    throw new NotImplementedApplicationError(
+      "Correction rule persistence is not implemented yet."
+    );
+  }
+
+  public async findRelevantRulesByUserId(_input: {
+    readonly userId: string;
+    readonly queryEmbedding: ReadonlyArray<number>;
+    readonly limit: number;
+  }): Promise<ReadonlyArray<never>> {
+    void _input;
 
     throw new NotImplementedApplicationError(
       "Correction rule persistence is not implemented yet."
@@ -243,6 +295,18 @@ export class NoopEmbeddingGateway implements EmbeddingGateway {
 
     throw new NotImplementedApplicationError(
       "Embedding generation is not implemented yet."
+    );
+  }
+}
+
+export class NoopCorrectionAnalysisGateway implements CorrectionAnalysisGateway {
+  public async analyzeConversation(
+    _input: AnalyzeCorrectionConversationInput
+  ): Promise<CorrectionAnalysisResult> {
+    void _input;
+
+    throw new NotImplementedApplicationError(
+      "Correction analysis is not implemented yet."
     );
   }
 }

@@ -8,6 +8,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  vector,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable(
@@ -135,6 +136,32 @@ export const messages = pgTable(
   ]
 );
 
+export const correctionRules = pgTable(
+  "correction_rules",
+  {
+    id: uuid("id").primaryKey(),
+    channelId: uuid("channel_id")
+      .notNull()
+      .references(() => chatChannels.id, { onDelete: "restrict" }),
+    triggerMessageId: uuid("trigger_message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "restrict" }),
+    ruleText: text("rule_text").notNull(),
+    embedding: vector("embedding", { dimensions: 1536 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("correction_rules_channel_id_idx").on(table.channelId),
+    index("correction_rules_trigger_message_id_idx").on(table.triggerMessageId),
+    index("correction_rules_embedding_hnsw_idx").using(
+      "hnsw",
+      table.embedding.op("vector_cosine_ops")
+    ),
+  ]
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   chatChannels: many(chatChannels),
   sessions: many(sessions),
@@ -146,6 +173,7 @@ export const chatChannelsRelations = relations(chatChannels, ({ many, one }) => 
     references: [users.id],
   }),
   messages: many(messages),
+  correctionRules: many(correctionRules),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -162,6 +190,17 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
+export const correctionRulesRelations = relations(correctionRules, ({ one }) => ({
+  chatChannel: one(chatChannels, {
+    fields: [correctionRules.channelId],
+    references: [chatChannels.id],
+  }),
+  triggerMessage: one(messages, {
+    fields: [correctionRules.triggerMessageId],
+    references: [messages.id],
+  }),
+}));
+
 export type UserRecord = typeof users.$inferSelect;
 export type NewUserRecord = typeof users.$inferInsert;
 export type SessionRecord = typeof sessions.$inferSelect;
@@ -170,3 +209,5 @@ export type ChatChannelRecord = typeof chatChannels.$inferSelect;
 export type NewChatChannelRecord = typeof chatChannels.$inferInsert;
 export type MessageRecord = typeof messages.$inferSelect;
 export type NewMessageRecord = typeof messages.$inferInsert;
+export type CorrectionRuleRecord = typeof correctionRules.$inferSelect;
+export type NewCorrectionRuleRecord = typeof correctionRules.$inferInsert;

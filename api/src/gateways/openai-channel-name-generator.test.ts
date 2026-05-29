@@ -1,4 +1,4 @@
-import { getOpenAiChatModel } from "@/db/env";
+import { getOpenAiChatModel, getOpenAiEmbeddingModel } from "@/db/env";
 import { OpenAiChannelNameGenerator } from "@/gateways/openai-channel-name-generator";
 
 describe("OpenAiChannelNameGenerator", () => {
@@ -79,19 +79,32 @@ describe("OpenAiChannelNameGenerator", () => {
 
 describe("getOpenAiChatModel", () => {
   const originalModel = process.env.OPENAI_CHAT_MODEL;
+  const originalEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL;
 
   afterEach(() => {
     if (originalModel === undefined) {
       delete process.env.OPENAI_CHAT_MODEL;
+    } else {
+      process.env.OPENAI_CHAT_MODEL = originalModel;
+    }
+
+    if (originalEmbeddingModel === undefined) {
+      delete process.env.OPENAI_EMBEDDING_MODEL;
       return;
     }
 
-    process.env.OPENAI_CHAT_MODEL = originalModel;
+    process.env.OPENAI_EMBEDDING_MODEL = originalEmbeddingModel;
   });
 
   it("uses gpt-4o when OPENAI_CHAT_MODEL is not set", () => {
     delete process.env.OPENAI_CHAT_MODEL;
 
     expect(getOpenAiChatModel()).toBe("gpt-4o");
+  });
+
+  it("uses text-embedding-3-small when OPENAI_EMBEDDING_MODEL is not set", () => {
+    delete process.env.OPENAI_EMBEDDING_MODEL;
+
+    expect(getOpenAiEmbeddingModel()).toBe("text-embedding-3-small");
   });
 });

@@ -1,14 +1,26 @@
 import { getRuntimeDatabase } from "@/db/client";
-import { getOpenAiApiKey, getOpenAiChatModel, getSessionTtlSeconds } from "@/db/env";
+import {
+  getOpenAiApiKey,
+  getOpenAiChatModel,
+  getOpenAiEmbeddingModel,
+  getSessionTtlSeconds,
+} from "@/db/env";
 import { BcryptPasswordHasher } from "@/gateways/bcrypt-password-hasher";
 import { DrizzleChatChannelGateway } from "@/gateways/drizzle-chat-channel-gateway";
+import { DrizzleCorrectionRuleGateway } from "@/gateways/drizzle-correction-rule-gateway";
 import { DrizzleMessageGateway } from "@/gateways/drizzle-message-gateway";
 import { DrizzleSessionGateway } from "@/gateways/drizzle-session-gateway";
 import { DrizzleUserGateway } from "@/gateways/drizzle-user-gateway";
 import { SafeFallbackChannelNameGenerator } from "@/gateways/fallback-channel-name-generator";
-import { NoopChannelNameGeneratorGateway } from "@/gateways/noop-gateways";
+import { LangChainCorrectionAnalysisGateway } from "@/gateways/langchain-correction-analysis-gateway";
+import {
+  NoopChannelNameGeneratorGateway,
+  NoopCorrectionAnalysisGateway,
+  NoopEmbeddingGateway,
+} from "@/gateways/noop-gateways";
 import { OpenAiChannelNameGenerator } from "@/gateways/openai-channel-name-generator";
 import { OpenAiChatCompletionGateway } from "@/gateways/openai-chat-completion-gateway";
+import { OpenAiEmbeddingGateway } from "@/gateways/openai-embedding-gateway";
 import type { SessionGateway } from "@/gateways/session-gateway";
 import { AiReplyLifecycleService } from "@/services/ai-reply-lifecycle-service";
 import { SystemClock } from "@/shared/clock";
@@ -42,6 +54,7 @@ export const createAppComposition = (): AppComposition => {
   const passwordHasher = new BcryptPasswordHasher();
   const chatChannelGateway = new DrizzleChatChannelGateway(database);
   const messageGateway = new DrizzleMessageGateway(database);
+  const correctionRuleGateway = new DrizzleCorrectionRuleGateway(database);
   const clock = new SystemClock();
   const idGenerator = new CryptoIdGenerator();
   const openAiApiKey = getOpenAiApiKey();
@@ -58,10 +71,26 @@ export const createAppComposition = (): AppComposition => {
   const channelNameGeneratorGateway = new SafeFallbackChannelNameGenerator({
     primaryGenerator: primaryChannelNameGenerator,
   });
+  const correctionAnalysisGateway = openAiApiKey
+    ? new LangChainCorrectionAnalysisGateway({
+        apiKey: openAiApiKey,
+        model: getOpenAiChatModel(),
+      })
+    : new NoopCorrectionAnalysisGateway();
+  const embeddingGateway = openAiApiKey
+    ? new OpenAiEmbeddingGateway({
+        apiKey: openAiApiKey,
+        model: getOpenAiEmbeddingModel(),
+      })
+    : new NoopEmbeddingGateway();
   const aiReplyLifecycleService = new AiReplyLifecycleService({
     messageGateway,
     chatCompletionGateway,
+    correctionAnalysisGateway,
+    correctionRuleGateway,
+    embeddingGateway,
     clock,
+    idGenerator,
   });
 
   return {
@@ -96,6 +125,8 @@ export const createAppComposition = (): AppComposition => {
       clock,
       idGenerator,
     }),
-    sendMessageFeedbackUseCase: new SendMessageFeedbackUseCase(),
+    sendMessageFeedbackUseCase: new SendMessageFeedbackUseCase({
+      messageGateway,
+    }),
   };
 };

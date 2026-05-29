@@ -1,7 +1,11 @@
 import type { ChatMessage } from "@/entities/chat-message";
 import type { ChatCompletionGateway } from "@/gateways/chat-completion-gateway";
+import type { CorrectionAnalysisGateway } from "@/gateways/correction-analysis-gateway";
+import type { CorrectionRuleGateway } from "@/gateways/correction-rule-gateway";
+import type { EmbeddingGateway } from "@/gateways/embedding-gateway";
 import type { MessageGateway } from "@/gateways/message-gateway";
 import type { Clock } from "@/shared/clock";
+import type { IdGenerator } from "@/shared/id-generator";
 
 export interface StartAiReplyLifecycleCommand {
   readonly authenticatedUserId: string;
@@ -12,12 +16,18 @@ export interface StartAiReplyLifecycleCommand {
 interface AiReplyLifecycleServiceDependencies {
   readonly messageGateway: MessageGateway;
   readonly chatCompletionGateway: ChatCompletionGateway;
+  readonly correctionAnalysisGateway: CorrectionAnalysisGateway;
+  readonly correctionRuleGateway: CorrectionRuleGateway;
+  readonly embeddingGateway: EmbeddingGateway;
   readonly clock: Clock;
+  readonly idGenerator: IdGenerator;
   readonly timeoutMilliseconds?: number;
 }
 
 const AI_TIMEOUT_MESSAGE = "AI応答がありません";
 const DEFAULT_TIMEOUT_MILLISECONDS = 60_000;
+const RELEVANT_RULE_LIMIT = 5;
+const FEEDBACK_EXAMPLE_LIMIT = 10;
 const AI_REPLY_SYSTEM_PROMPT = [
   "あなたは親しみやすく、会話しやすいAIアシスタントです。",
   "フレンドリーで自然な日本語で答えてください。",
@@ -41,6 +51,61 @@ const toConversationHistory = (
       },
     ];
   });
+
+const findLatestUserMessage = (
+  messages: ReadonlyArray<ChatMessage>
+): ChatMessage | null => {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (
+      messages[index].senderType === "user" &&
+      messages[index].messageText !== null
+    ) {
+      return messages[index];
+    }
+  }
+
+  return null;
+};
+
+const removePendingMessages = (
+  messages: ReadonlyArray<ChatMessage>
+): ReadonlyArray<ChatMessage> =>
+  messages.filter((message) => message.status !== "pending");
+
+const buildLearningPrompt = (input: {
+  readonly relevantRules: ReadonlyArray<{
+    readonly ruleText: string;
+  }>;
+  readonly feedbackExamples: ReadonlyArray<{
+    readonly messageText: string;
+    readonly aiFeedback: boolean;
+  }>;
+}): string => {
+  const sections = [AI_REPLY_SYSTEM_PROMPT];
+
+  if (input.relevantRules.length > 0) {
+    sections.push(
+      [
+        "以下は過去の訂正から抽出されたルールです。今回の回答でも優先して守ってください。",
+        ...input.relevantRules.map((rule, index) => `${index + 1}. ${rule.ruleText}`),
+      ].join("\n")
+    );
+  }
+
+  if (input.feedbackExamples.length > 0) {
+    sections.push(
+      [
+        "以下は過去のAI回答に対する評価例です。Good は参考にし、Bad は避けてください。",
+        ...input.feedbackExamples.map((example, index) => {
+          const label = example.aiFeedback ? "Good" : "Bad";
+          return `${index + 1}. ${label}: ${example.messageText}`;
+        }),
+      ].join("\n")
+    );
+  }
+
+  return sections.join("\n\n");
+};
 
 export class AiReplyLifecycleService {
   private readonly timeoutMilliseconds: number;
@@ -73,13 +138,28 @@ export class AiReplyLifecycleService {
     readonly pendingMessageId: string;
     readonly conversationHistory: ReadonlyArray<ChatMessage>;
   }): Promise<void> {
+    const conversationWithoutPending = removePendingMessages(
+      command.conversationHistory
+    );
+    const latestUserMessage = findLatestUserMessage(conversationWithoutPending);
+    const learningContext = latestUserMessage
+      ? await this.loadLearningContext({
+          authenticatedUserId: command.authenticatedUserId,
+          channelId: command.channelId,
+          conversationHistory: conversationWithoutPending,
+          latestUserMessage,
+        })
+      : {
+          relevantRules: [],
+          feedbackExamples: [],
+        };
     const timeout = this.createTimeoutPromise();
 
     try {
       const completionPromise =
         this.dependencies.chatCompletionGateway.generateReply({
-          conversationHistory: toConversationHistory(command.conversationHistory),
-          systemPrompt: AI_REPLY_SYSTEM_PROMPT,
+          conversationHistory: toConversationHistory(conversationWithoutPending),
+          systemPrompt: buildLearningPrompt(learningContext),
           userId: command.authenticatedUserId,
           channelId: command.channelId,
           metadata: {
@@ -119,6 +199,114 @@ export class AiReplyLifecycleService {
     } catch {
       timeout.cancel();
       await this.markTimedOut(command);
+    }
+  }
+
+  private async loadLearningContext(input: {
+    readonly authenticatedUserId: string;
+    readonly channelId: string;
+    readonly conversationHistory: ReadonlyArray<ChatMessage>;
+    readonly latestUserMessage: ChatMessage;
+  }): Promise<{
+    readonly relevantRules: ReadonlyArray<{
+      readonly ruleText: string;
+    }>;
+    readonly feedbackExamples: ReadonlyArray<{
+      readonly messageText: string;
+      readonly aiFeedback: boolean;
+    }>;
+  }> {
+    await this.tryPersistExtractedRules(input);
+
+    const feedbackExamplesPromise =
+      this.dependencies.messageGateway.listFeedbackExamplesByUserId(
+        input.authenticatedUserId,
+        FEEDBACK_EXAMPLE_LIMIT
+      );
+
+    const relevantRulesPromise = this.findRelevantRules(input);
+    const [feedbackExamples, relevantRules] = await Promise.all([
+      feedbackExamplesPromise.catch((error: unknown) => {
+        console.error(error);
+        return [];
+      }),
+      relevantRulesPromise,
+    ]);
+
+    return {
+      relevantRules,
+      feedbackExamples,
+    };
+  }
+
+  private async tryPersistExtractedRules(input: {
+    readonly authenticatedUserId: string;
+    readonly channelId: string;
+    readonly conversationHistory: ReadonlyArray<ChatMessage>;
+    readonly latestUserMessage: ChatMessage;
+  }): Promise<void> {
+    try {
+      const correctionAnalysis =
+        await this.dependencies.correctionAnalysisGateway.analyzeConversation({
+          conversationHistory: input.conversationHistory,
+          latestUserMessage: input.latestUserMessage,
+        });
+
+      if (
+        !correctionAnalysis.isCorrectionIntent ||
+        correctionAnalysis.extractedRules.length === 0
+      ) {
+        return;
+      }
+
+      const createdAt = this.dependencies.clock.now().toISOString();
+      const embeddings = await Promise.all(
+        correctionAnalysis.extractedRules.map((rule) =>
+          this.dependencies.embeddingGateway.generateEmbedding(rule)
+        )
+      );
+
+      await this.dependencies.correctionRuleGateway.saveRules(
+        correctionAnalysis.extractedRules.map((rule, index) => ({
+          id: this.dependencies.idGenerator.generate(),
+          channelId: input.channelId,
+          triggerMessageId: input.latestUserMessage.id,
+          ruleText: rule,
+          embedding: embeddings[index],
+          createdAt,
+        }))
+      );
+    } catch (error: unknown) {
+      console.error(error);
+    }
+  }
+
+  private async findRelevantRules(input: {
+    readonly authenticatedUserId: string;
+    readonly latestUserMessage: ChatMessage;
+  }): Promise<ReadonlyArray<{
+    readonly ruleText: string;
+  }>> {
+    try {
+      const messageText = input.latestUserMessage.messageText;
+
+      if (!messageText) {
+        return [];
+      }
+
+      const queryEmbedding =
+        await this.dependencies.embeddingGateway.generateEmbedding(messageText);
+      const relevantRules =
+        await this.dependencies.correctionRuleGateway.findRelevantRulesByUserId({
+          userId: input.authenticatedUserId,
+          queryEmbedding,
+          limit: RELEVANT_RULE_LIMIT,
+        });
+
+      return relevantRules;
+    } catch (error: unknown) {
+      console.error(error);
+      return [];
     }
   }
 

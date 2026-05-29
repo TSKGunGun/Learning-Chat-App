@@ -85,6 +85,10 @@ export const getOpenAiApiKey = (): string | null =>
 export const getOpenAiChatModel = (): string =>
   getOptionalEnvironmentVariable("OPENAI_CHAT_MODEL") ?? "gpt-4o";
 
+export const getOpenAiEmbeddingModel = (): string =>
+  getOptionalEnvironmentVariable("OPENAI_EMBEDDING_MODEL") ??
+  "text-embedding-3-small";
+
 export const getDevSeedConfig = (): DevSeedConfig => {
   return {
     username: requireEnvironmentVariable("SEED_DEV_USERNAME"),

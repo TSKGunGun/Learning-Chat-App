@@ -14,7 +14,22 @@ import type {
   ChatCompletionGateway,
   ChatCompletionRequest,
 } from "@/gateways/chat-completion-gateway";
+import type {
+  AnalyzeCorrectionConversationInput,
+  CorrectionAnalysisGateway,
+  CorrectionAnalysisResult,
+} from "@/gateways/correction-analysis-gateway";
+import type {
+  CorrectionRuleGateway,
+  RelevantCorrectionRule,
+  SaveCorrectionRuleInput,
+} from "@/gateways/correction-rule-gateway";
+import type { EmbeddingGateway } from "@/gateways/embedding-gateway";
 import type { MessageGateway, UpdateAiMessageInput } from "@/gateways/message-gateway";
+import type {
+  AiFeedbackExample,
+  OwnedAiMessageForFeedback,
+} from "@/gateways/message-gateway";
 import type { AuthenticationUserRecord, UserGateway } from "@/gateways/user-gateway";
 import type { SessionGateway } from "@/gateways/session-gateway";
 import { BcryptPasswordHasher } from "@/gateways/bcrypt-password-hasher";
@@ -80,6 +95,9 @@ interface MessageFlowTestContext {
   readonly messageGateway: TestMessageGateway;
   readonly channelNameGeneratorGateway: TestChannelNameGeneratorGateway;
   readonly chatCompletionGateway: TestChatCompletionGateway;
+  readonly correctionAnalysisGateway: TestCorrectionAnalysisGateway;
+  readonly correctionRuleGateway: TestCorrectionRuleGateway;
+  readonly embeddingGateway: TestEmbeddingGateway;
   readonly createChatUseCase: CreateChatWithFirstMessageUseCase;
   readonly sendMessageToChatUseCase: SendMessageToChatUseCase;
 }
@@ -189,6 +207,12 @@ class TestChatChannelGateway implements ChatChannelGateway {
       name: channel.name,
       lastMessagedAt: channel.lastMessagedAt,
     };
+  }
+
+  public ownsChannel(userId: string, channelId: string): boolean {
+    return this.channels.some(
+      (candidate) => candidate.userId === userId && candidate.id === channelId
+    );
   }
 
   public setLastMessagedAt(channelId: string, lastMessagedAt: string): void {
@@ -310,11 +334,24 @@ class TestMessageGateway implements MessageGateway {
     readonly status: "completed" | "ai_timeout";
     readonly messageText: string;
   }> = [];
+  public readonly updatedFeedbacks: Array<{
+    readonly messageId: string;
+    readonly aiFeedback: boolean | null;
+  }> = [];
+  private readonly feedbackUpdatedAtByMessageId = new Map<string, string>();
 
   public constructor(
     private readonly messagesByChannelId: Map<string, ChatMessage[]>,
     private readonly chatChannelGateway: TestChatChannelGateway
-  ) {}
+  ) {
+    for (const channelMessages of messagesByChannelId.values()) {
+      for (const message of channelMessages) {
+        if (message.aiFeedback !== null) {
+          this.feedbackUpdatedAtByMessageId.set(message.id, message.createdAt);
+        }
+      }
+    }
+  }
 
   public async listByChannelId(
     channelId: string
@@ -415,11 +452,107 @@ class TestMessageGateway implements MessageGateway {
   }
 
   public async updateMessageFeedback(
-    _messageId: string,
-    _feedback: boolean | null
+    messageId: string,
+    feedback: boolean | null
   ): Promise<void> {
-    void _messageId;
-    void _feedback;
+    this.updatedFeedbacks.push({
+      messageId,
+      aiFeedback: feedback,
+    });
+    this.feedbackUpdatedAtByMessageId.set(messageId, new Date().toISOString());
+
+    for (const [channelId, channelMessages] of this.messagesByChannelId.entries()) {
+      const messageIndex = channelMessages.findIndex(
+        (message) => message.id === messageId
+      );
+
+      if (messageIndex === -1) {
+        continue;
+      }
+
+      this.messagesByChannelId.set(channelId, [
+        ...channelMessages.slice(0, messageIndex),
+        {
+          ...channelMessages[messageIndex],
+          aiFeedback: feedback,
+        },
+        ...channelMessages.slice(messageIndex + 1),
+      ]);
+
+      return;
+    }
+  }
+
+  public async findOwnedAiMessageForFeedback(
+    userId: string,
+    channelId: string,
+    messageId: string
+  ): Promise<OwnedAiMessageForFeedback | null> {
+    const activeChannel = await this.chatChannelGateway.findActiveOwnedById(
+      userId,
+      channelId
+    );
+
+    if (!activeChannel) {
+      return null;
+    }
+
+    const channelMessages = this.messagesByChannelId.get(channelId) ?? [];
+    const message = channelMessages.find(
+      (candidate) =>
+        candidate.id === messageId && candidate.senderType === "ai"
+    );
+
+    if (!message) {
+      return null;
+    }
+
+    return {
+      id: message.id,
+      channelId: message.channelId,
+      status: message.status,
+      aiFeedback: message.aiFeedback,
+    };
+  }
+
+  public async listFeedbackExamplesByUserId(
+    userId: string,
+    limit: number
+  ): Promise<ReadonlyArray<AiFeedbackExample>> {
+    const feedbackExamples = Array.from(this.messagesByChannelId.entries())
+      .flatMap(([channelId, channelMessages]) => {
+        if (!this.chatChannelGateway.ownsChannel(userId, channelId)) {
+          return [];
+        }
+
+        return channelMessages.flatMap((message) => {
+          if (
+            message.senderType !== "ai" ||
+            message.status !== "completed" ||
+            message.aiFeedback === null ||
+            message.messageText === null
+          ) {
+            return [];
+          }
+
+          return [
+            {
+              messageId: message.id,
+              channelId: message.channelId,
+              messageText: message.messageText,
+              aiFeedback: message.aiFeedback,
+              feedbackUpdatedAt:
+                this.feedbackUpdatedAtByMessageId.get(message.id) ??
+                message.createdAt,
+            },
+          ];
+        });
+      })
+      .sort((left, right) =>
+        right.feedbackUpdatedAt.localeCompare(left.feedbackUpdatedAt)
+      );
+
+    return feedbackExamples.slice(0, limit);
   }
 }
 
@@ -482,6 +615,75 @@ class TestChatCompletionGateway implements ChatCompletionGateway {
     this.calls.push(request);
 
     return this.replyFactory(request);
+  }
+}
+
+class TestCorrectionAnalysisGateway implements CorrectionAnalysisGateway {
+  public readonly calls: AnalyzeCorrectionConversationInput[] = [];
+
+  public constructor(
+    private readonly analysisFactory: (
+      input: AnalyzeCorrectionConversationInput
+    ) => Promise<CorrectionAnalysisResult>
+  ) {}
+
+  public async analyzeConversation(
+    input: AnalyzeCorrectionConversationInput
+  ): Promise<CorrectionAnalysisResult> {
+    this.calls.push(input);
+
+    return this.analysisFactory(input);
+  }
+}
+
+class TestCorrectionRuleGateway implements CorrectionRuleGateway {
+  public readonly savedRules: SaveCorrectionRuleInput[] = [];
+  public readonly relevantRuleQueries: Array<{
+    readonly userId: string;
+    readonly queryEmbedding: ReadonlyArray<number>;
+    readonly limit: number;
+  }> = [];
+
+  public constructor(
+    private readonly relevantRulesFactory: (
+      input: {
+        readonly userId: string;
+        readonly queryEmbedding: ReadonlyArray<number>;
+        readonly limit: number;
+      }
+    ) => Promise<ReadonlyArray<RelevantCorrectionRule>>
+  ) {}
+
+  public async saveRules(rules: ReadonlyArray<SaveCorrectionRuleInput>): Promise<void> {
+    this.savedRules.push(...rules);
+  }
+
+  public async findRelevantRulesByUserId(input: {
+    readonly userId: string;
+    readonly queryEmbedding: ReadonlyArray<number>;
+    readonly limit: number;
+  }): Promise<ReadonlyArray<RelevantCorrectionRule>> {
+    this.relevantRuleQueries.push(input);
+
+    return this.relevantRulesFactory(input);
+  }
+}
+
+class TestEmbeddingGateway implements EmbeddingGateway {
+  public readonly calls: string[] = [];
+
+  public constructor(
+    private readonly embeddingFactory: (
+      input: string
+    ) => Promise<ReadonlyArray<number>>
+  ) {}
+
+  public async generateEmbedding(
+    input: string
+  ): Promise<ReadonlyArray<number>> {
+    this.calls.push(input);
+
+    return this.embeddingFactory(input);
   }
 }
 
@@ -678,6 +880,12 @@ const createChatSliceTestContext = (): ChatSliceTestContext => {
 const createMessageFlowTestContext = ({
   channelName = "AI Summary Channel",
   replyFactory = async () => "AI generated reply",
+  correctionAnalysisFactory = async () => ({
+    isCorrectionIntent: false,
+    extractedRules: [],
+  }),
+  relevantRulesFactory = async () => [],
+  embeddingFactory = async () => [0.1, 0.2, 0.3],
   clockValues = [
     "2026-05-29T00:00:00.000Z",
     "2026-05-29T00:00:01.000Z",
@@ -718,6 +926,19 @@ const createMessageFlowTestContext = ({
   readonly replyFactory?: (
     request: ChatCompletionRequest
   ) => Promise<string>;
+  readonly correctionAnalysisFactory?: (
+    input: AnalyzeCorrectionConversationInput
+  ) => Promise<CorrectionAnalysisResult>;
+  readonly relevantRulesFactory?: (
+    input: {
+      readonly userId: string;
+      readonly queryEmbedding: ReadonlyArray<number>;
+      readonly limit: number;
+    }
+  ) => Promise<ReadonlyArray<RelevantCorrectionRule>>;
+  readonly embeddingFactory?: (
+    input: string
+  ) => Promise<ReadonlyArray<number>>;
   readonly clockValues?: string[];
   readonly generatedIds?: string[];
   readonly channels?: StoredChatChannel[];
@@ -734,10 +955,21 @@ const createMessageFlowTestContext = ({
   const channelNameGeneratorGateway = new TestChannelNameGeneratorGateway(
     channelName
   );
+  const correctionAnalysisGateway = new TestCorrectionAnalysisGateway(
+    correctionAnalysisFactory
+  );
+  const correctionRuleGateway = new TestCorrectionRuleGateway(
+    relevantRulesFactory
+  );
+  const embeddingGateway = new TestEmbeddingGateway(embeddingFactory);
   const aiReplyLifecycleService = new AiReplyLifecycleService({
     messageGateway,
     chatCompletionGateway,
+    correctionAnalysisGateway,
+    correctionRuleGateway,
+    embeddingGateway,
     clock,
+    idGenerator,
   });
 
   return {
@@ -745,6 +977,9 @@ const createMessageFlowTestContext = ({
     messageGateway,
     channelNameGeneratorGateway,
     chatCompletionGateway,
+    correctionAnalysisGateway,
+    correctionRuleGateway,
+    embeddingGateway,
     createChatUseCase: new CreateChatWithFirstMessageUseCase({
       chatChannelGateway,
       messageGateway,
@@ -764,8 +999,9 @@ const createMessageFlowTestContext = ({
 };
 
 const flushMicrotasks = async (): Promise<void> => {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let index = 0; index < 10; index += 1) {
+    await Promise.resolve();
+  }
 };
 
 describe("API auth persistence", () => {
@@ -1393,6 +1629,7 @@ describe("API auth persistence", () => {
     });
 
     await flushMicrotasks();
+    await flushMicrotasks();
 
     expect(channelNameGeneratorGateway.calls).toEqual([
       {
@@ -1537,6 +1774,206 @@ describe("API auth persistence", () => {
       name: "Project Kickoff",
       lastMessagedAt: "2026-05-29T01:00:02.000Z",
     });
+  });
+
+  it("extracts correction rules and includes rules plus feedback examples in the reply prompt", async () => {
+    const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const {
+      correctionAnalysisGateway,
+      correctionRuleGateway,
+      embeddingGateway,
+      sendMessageToChatUseCase,
+      chatCompletionGateway,
+    } = createMessageFlowTestContext({
+      replyFactory: async () => "訂正を反映したAI回答",
+      correctionAnalysisFactory: async () => ({
+        isCorrectionIntent: true,
+        extractedRules: ["結論から答える", "箇条書きは必要なときだけ使う"],
+      }),
+      embeddingFactory: async (input) => {
+        if (input === "結論から答える") {
+          return [0.11, 0.12, 0.13];
+        }
+
+        if (input === "箇条書きは必要なときだけ使う") {
+          return [0.21, 0.22, 0.23];
+        }
+
+        return [0.31, 0.32, 0.33];
+      },
+      relevantRulesFactory: async () => [
+        {
+          ruleText: "冒頭で要点を先に述べる",
+          similarity: 0.95,
+          channelId: VALID_CHANNEL_ID,
+          triggerMessageId: VALID_MESSAGE_ID,
+          createdAt: "2026-05-28T10:00:00.000Z",
+        },
+      ],
+      channels: [
+        {
+          id: VALID_CHANNEL_ID,
+          userId: TEST_USER_ID,
+          name: "Project Kickoff",
+          lastMessagedAt: "2026-05-28T10:30:00.000Z",
+        },
+        {
+          id: SECOND_CHANNEL_ID,
+          userId: TEST_USER_ID,
+          name: "Deleted Learning Channel",
+          lastMessagedAt: "2026-05-27T09:00:00.000Z",
+          isDeleted: true,
+        },
+      ],
+      messagesByChannelId: new Map<string, ChatMessage[]>([
+        [
+          VALID_CHANNEL_ID,
+          [
+            {
+              id: VALID_MESSAGE_ID,
+              channelId: VALID_CHANNEL_ID,
+              senderType: "user",
+              messageText: "Need help with the kickoff doc.",
+              status: "completed",
+              aiFeedback: null,
+              createdAt: "2026-05-28T10:30:00.000Z",
+            },
+            {
+              id: SECOND_MESSAGE_ID,
+              channelId: VALID_CHANNEL_ID,
+              senderType: "ai",
+              messageText: "情報を長く並べた回答です。",
+              status: "completed",
+              aiFeedback: false,
+              createdAt: "2026-05-28T10:31:00.000Z",
+            },
+          ],
+        ],
+        [
+          SECOND_CHANNEL_ID,
+          [
+            {
+              id: THIRD_MESSAGE_ID,
+              channelId: SECOND_CHANNEL_ID,
+              senderType: "ai",
+              messageText: "結論を先に短く述べた回答です。",
+              status: "completed",
+              aiFeedback: true,
+              createdAt: "2026-05-27T09:00:00.000Z",
+            },
+          ],
+        ],
+      ]),
+      clockValues: [
+        "2026-05-29T03:00:00.000Z",
+        "2026-05-29T03:00:01.000Z",
+        "2026-05-29T03:00:02.000Z",
+        "2026-05-29T03:00:03.000Z",
+      ],
+      generatedIds: [
+        "81818181-8181-4181-8181-818181818181",
+        "91919191-9191-4191-8191-919191919191",
+        "a1a1a1a1-a1a1-41a1-81a1-a1a1a1a1a1a1",
+        "b2b2b2b2-b2b2-42b2-82b2-b2b2b2b2b2b2",
+      ],
+    });
+    const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+    const app = createApiApp({
+      loginUseCase,
+      sessionGateway,
+      sendMessageToChatUseCase,
+    });
+    const response = await app.request(
+      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: `session=${sessionToken}`,
+        },
+        body: JSON.stringify({
+          message_text: "前の回答を訂正してください。要点を先に短く答えてください。",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+
+    await flushMicrotasks();
+
+    expect(chatCompletionGateway.calls).toHaveLength(1);
+    expect(correctionAnalysisGateway.calls).toHaveLength(1);
+    expect(correctionRuleGateway.savedRules.map((rule) => rule.ruleText)).toEqual([
+      "結論から答える",
+      "箇条書きは必要なときだけ使う",
+    ]);
+    expect(embeddingGateway.calls).toEqual([
+      "結論から答える",
+      "箇条書きは必要なときだけ使う",
+      "前の回答を訂正してください。要点を先に短く答えてください。",
+    ]);
+    expect(chatCompletionGateway.calls[0]?.systemPrompt).toContain(
+      "冒頭で要点を先に述べる"
+    );
+    expect(chatCompletionGateway.calls[0]?.systemPrompt).toContain(
+      "Bad: 情報を長く並べた回答です。"
+    );
+    expect(chatCompletionGateway.calls[0]?.systemPrompt).toContain(
+      "Good: 結論を先に短く述べた回答です。"
+    );
+  });
+
+  it("falls back to a normal reply when correction extraction fails", async () => {
+    const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const {
+      correctionRuleGateway,
+      sendMessageToChatUseCase,
+      chatCompletionGateway,
+    } = createMessageFlowTestContext({
+      replyFactory: async () => "通常のAI回答",
+      correctionAnalysisFactory: async () => {
+        throw new Error("analysis failed");
+      },
+      clockValues: [
+        "2026-05-29T03:30:00.000Z",
+        "2026-05-29T03:30:01.000Z",
+        "2026-05-29T03:30:02.000Z",
+      ],
+      generatedIds: [
+        "c3c3c3c3-c3c3-43c3-83c3-c3c3c3c3c3c3",
+        "d4d4d4d4-d4d4-44d4-84d4-d4d4d4d4d4d4",
+      ],
+    });
+    const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+    const app = createApiApp({
+      loginUseCase,
+      sessionGateway,
+      sendMessageToChatUseCase,
+    });
+    const response = await app.request(
+      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: `session=${sessionToken}`,
+        },
+        body: JSON.stringify({
+          message_text: "前の回答を修正してください。",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(chatCompletionGateway.calls).toHaveLength(1);
+    expect(correctionRuleGateway.savedRules).toEqual([]);
+    expect(chatCompletionGateway.calls[0]?.systemPrompt).toContain(
+      "あなたは親しみやすく、会話しやすいAIアシスタントです。"
+    );
   });
 
   it("returns 422 when an existing chat already has a pending AI response", async () => {
@@ -1820,12 +2257,116 @@ describe("API auth persistence", () => {
     }
   });
 
-  it("keeps scaffold response for authenticated feedback requests", async () => {
+  it("stores feedback for a completed ai message", async () => {
     const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const { messageGateway } = createMessageFlowTestContext({
+      messagesByChannelId: new Map<string, ChatMessage[]>([
+        [
+          VALID_CHANNEL_ID,
+          [
+            {
+              id: SECOND_MESSAGE_ID,
+              channelId: VALID_CHANNEL_ID,
+              senderType: "ai",
+              messageText: "完成したAI回答です。",
+              status: "completed",
+              aiFeedback: null,
+              createdAt: "2026-05-28T10:31:00.000Z",
+            },
+          ],
+        ],
+      ]),
+    });
     const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
     const app = createApiApp({
       loginUseCase,
       sessionGateway,
+      sendMessageFeedbackUseCase: new SendMessageFeedbackUseCase({
+        messageGateway,
+      }),
+    });
+    const response = await app.request(
+      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages/${SECOND_MESSAGE_ID}/feedback`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: `session=${sessionToken}`,
+        },
+        body: JSON.stringify({ ai_feedback: true }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      message_id: SECOND_MESSAGE_ID,
+      ai_feedback: true,
+    });
+    expect(messageGateway.updatedFeedbacks).toEqual([
+      {
+        messageId: SECOND_MESSAGE_ID,
+        aiFeedback: true,
+      },
+    ]);
+  });
+
+  it("toggles feedback off when the same value is sent twice", async () => {
+    const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const { messageGateway } = createMessageFlowTestContext({
+      messagesByChannelId: new Map<string, ChatMessage[]>([
+        [
+          VALID_CHANNEL_ID,
+          [
+            {
+              id: SECOND_MESSAGE_ID,
+              channelId: VALID_CHANNEL_ID,
+              senderType: "ai",
+              messageText: "すでにGood評価のAI回答です。",
+              status: "completed",
+              aiFeedback: true,
+              createdAt: "2026-05-28T10:31:00.000Z",
+            },
+          ],
+        ],
+      ]),
+    });
+    const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+    const app = createApiApp({
+      loginUseCase,
+      sessionGateway,
+      sendMessageFeedbackUseCase: new SendMessageFeedbackUseCase({
+        messageGateway,
+      }),
+    });
+    const response = await app.request(
+      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages/${SECOND_MESSAGE_ID}/feedback`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: `session=${sessionToken}`,
+        },
+        body: JSON.stringify({ ai_feedback: true }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      message_id: SECOND_MESSAGE_ID,
+      ai_feedback: null,
+    });
+  });
+
+  it("returns 404 when feedback targets a non-ai or missing message", async () => {
+    const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const { messageGateway } = createMessageFlowTestContext();
+    const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+    const app = createApiApp({
+      loginUseCase,
+      sessionGateway,
+      sendMessageFeedbackUseCase: new SendMessageFeedbackUseCase({
+        messageGateway,
+      }),
     });
     const response = await app.request(
       `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages/${VALID_MESSAGE_ID}/feedback`,
@@ -1839,9 +2380,55 @@ describe("API auth persistence", () => {
       }
     );
 
-    expect(response.status).toBe(501);
-    await expect(response.json()).resolves.toMatchObject({
-      message: expect.stringContaining("is not implemented yet."),
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      message: "AI message not found.",
+    });
+  });
+
+  it("returns 422 when feedback targets a pending ai message", async () => {
+    const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const { messageGateway } = createMessageFlowTestContext({
+      messagesByChannelId: new Map<string, ChatMessage[]>([
+        [
+          VALID_CHANNEL_ID,
+          [
+            {
+              id: SECOND_MESSAGE_ID,
+              channelId: VALID_CHANNEL_ID,
+              senderType: "ai",
+              messageText: null,
+              status: "pending",
+              aiFeedback: null,
+              createdAt: "2026-05-28T10:31:00.000Z",
+            },
+          ],
+        ],
+      ]),
+    });
+    const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+    const app = createApiApp({
+      loginUseCase,
+      sessionGateway,
+      sendMessageFeedbackUseCase: new SendMessageFeedbackUseCase({
+        messageGateway,
+      }),
+    });
+    const response = await app.request(
+      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages/${SECOND_MESSAGE_ID}/feedback`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: `session=${sessionToken}`,
+        },
+        body: JSON.stringify({ ai_feedback: true }),
+      }
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      message: "Feedback is only available for completed AI messages.",
     });
   });
 

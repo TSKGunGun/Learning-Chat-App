@@ -13,6 +13,21 @@ export interface UpdateAiMessageInput {
   readonly lastMessagedAt: string;
 }
 
+export interface OwnedAiMessageForFeedback {
+  readonly id: string;
+  readonly channelId: string;
+  readonly status: "pending" | "completed" | "ai_timeout";
+  readonly aiFeedback: boolean | null;
+}
+
+export interface AiFeedbackExample {
+  readonly messageId: string;
+  readonly channelId: string;
+  readonly messageText: string;
+  readonly aiFeedback: boolean;
+  readonly feedbackUpdatedAt: string;
+}
+
 export interface AppendedChatMessages {
   readonly userMessage: ChatMessage;
   readonly pendingAiMessage: ChatMessage;
@@ -33,4 +48,13 @@ export interface MessageGateway {
     messageId: string,
     feedback: boolean | null
   ): Promise<void>;
+  findOwnedAiMessageForFeedback(
+    userId: string,
+    channelId: string,
+    messageId: string
+  ): Promise<OwnedAiMessageForFeedback | null>;
+  listFeedbackExamplesByUserId(
+    userId: string,
+    limit: number
+  ): Promise<ReadonlyArray<AiFeedbackExample>>;
 }

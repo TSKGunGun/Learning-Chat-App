@@ -140,9 +140,3 @@ messageFeedback:
           application/json:
             schema:
               $ref: ../components/schemas.yaml#/ErrorResponse
-      '501':
-        description: スキャフォールド段階のため未実装
-        content:
-          application/json:
-            schema:
-              $ref: ../components/schemas.yaml#/ErrorResponse

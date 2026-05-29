@@ -28,6 +28,12 @@ export class PendingAiMessageAlreadyExistsError extends ApplicationError {
   }
 }
 
+export class MessageFeedbackNotAllowedError extends ApplicationError {
+  public constructor(message = "Feedback is only available for completed AI messages.") {
+    super(message, 422);
+  }
+}
+
 export class NotImplementedApplicationError extends ApplicationError {
   public constructor(message: string) {
     super(message, 501);

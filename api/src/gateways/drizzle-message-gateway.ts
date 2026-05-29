@@ -1,12 +1,14 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 
 import type { Database } from "@/db/client";
 import { chatChannels, messages } from "@/db/schema";
 import type { ChatMessage } from "@/entities/chat-message";
 import type {
+  AiFeedbackExample,
   AppendedChatMessages,
   AppendUserMessageWithPendingAiMessageInput,
   MessageGateway,
+  OwnedAiMessageForFeedback,
   UpdateAiMessageInput,
 } from "@/gateways/message-gateway";
 import {
@@ -252,5 +254,93 @@ export class DrizzleMessageGateway implements MessageGateway {
         feedbackUpdatedAt: new Date(),
       })
       .where(eq(messages.id, messageId));
+  }
+
+  public async findOwnedAiMessageForFeedback(
+    userId: string,
+    channelId: string,
+    messageId: string
+  ): Promise<OwnedAiMessageForFeedback | null> {
+    const [message] = await this.database
+      .select({
+        id: messages.id,
+        channelId: messages.channelId,
+        status: messages.status,
+        aiFeedback: messages.aiFeedback,
+      })
+      .from(messages)
+      .innerJoin(chatChannels, eq(messages.channelId, chatChannels.id))
+      .where(
+        and(
+          eq(messages.id, messageId),
+          eq(messages.channelId, channelId),
+          eq(messages.senderType, "ai"),
+          eq(chatChannels.userId, userId),
+          eq(chatChannels.isDeleted, false)
+        )
+      )
+      .limit(1);
+
+    if (!message) {
+      return null;
+    }
+
+    return {
+      id: message.id,
+      channelId: message.channelId,
+      status: message.status,
+      aiFeedback: message.aiFeedback,
+    };
+  }
+
+  public async listFeedbackExamplesByUserId(
+    userId: string,
+    limit: number
+  ): Promise<ReadonlyArray<AiFeedbackExample>> {
+    if (limit <= 0) {
+      return [];
+    }
+
+    const rows = await this.database
+      .select({
+        messageId: messages.id,
+        channelId: messages.channelId,
+        messageText: messages.messageText,
+        aiFeedback: messages.aiFeedback,
+        feedbackUpdatedAt: messages.feedbackUpdatedAt,
+      })
+      .from(messages)
+      .innerJoin(chatChannels, eq(messages.channelId, chatChannels.id))
+      .where(
+        and(
+          eq(chatChannels.userId, userId),
+          eq(messages.senderType, "ai"),
+          eq(messages.status, "completed"),
+          isNotNull(messages.aiFeedback),
+          isNotNull(messages.feedbackUpdatedAt)
+        )
+      )
+      .orderBy(desc(messages.feedbackUpdatedAt), desc(messages.createdAt))
+      .limit(limit);
+
+    return rows.flatMap((row) => {
+      if (
+        row.messageText === null ||
+        row.aiFeedback === null ||
+        row.feedbackUpdatedAt === null
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          messageId: row.messageId,
+          channelId: row.channelId,
+          messageText: row.messageText,
+          aiFeedback: row.aiFeedback,
+          feedbackUpdatedAt: row.feedbackUpdatedAt.toISOString(),
+        },
+      ];
+    });
   }
 }
