@@ -212,7 +212,7 @@ export function ChatWorkspacePreview({
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold">{message.authorLabel}</p>
                   <span className="text-xs text-muted-foreground">
-                    {message.statusLabel}
+                    {message.createdAtLabel}
                   </span>
                 </div>
                 <p className="mt-3 text-sm leading-6">{message.body}</p>

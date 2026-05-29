@@ -15,6 +15,14 @@ const createJsonResponse = (body: unknown, status = 200) =>
     },
   });
 
+const formatTimestampLabel = (value: string) =>
+  new Intl.DateTimeFormat("ja-JP", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+
 const createMessageResponse = (overrides: {
   readonly message_id: string;
   readonly sender_type: "user" | "ai";
@@ -212,6 +220,85 @@ describe("TopRoute workspace behavior", () => {
         "一覧操作を優先しつつ、モバイルではドロワー型サイドバーへ切り替えます。"
       )
     ).toBeInTheDocument();
+  });
+
+  it("renders chat messages in ascending created_at order and keeps the user message first when timestamps tie", async () => {
+    const olderCreatedAt = "2026-05-28T09:45:00.000Z";
+    const tiedCreatedAt = "2026-05-28T10:00:00.000Z";
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        const method = init?.method ?? "GET";
+
+        if (method === "GET" && url === "/api/chats") {
+          return createJsonResponse([
+            {
+              channel_id: "channel-1",
+              channel_name: "自己学習ルールの整理",
+              last_messaged_at: tiedCreatedAt,
+            },
+          ]);
+        }
+
+        if (method === "GET" && url === "/api/chats/channel-1") {
+          return createJsonResponse(
+            createChatDetailResponse({
+              channel_id: "channel-1",
+              channel_name: "自己学習ルールの整理",
+              last_messaged_at: tiedCreatedAt,
+              messages: [
+                createMessageResponse({
+                  message_id: "message-2",
+                  sender_type: "ai",
+                  message_text: "後から届いたAI回答です。",
+                  status: "completed",
+                  ai_feedback: false,
+                  created_at: tiedCreatedAt,
+                }),
+                createMessageResponse({
+                  message_id: "message-1",
+                  sender_type: "user",
+                  message_text: "先に送った質問です。",
+                  status: "completed",
+                  ai_feedback: null,
+                  created_at: tiedCreatedAt,
+                }),
+                createMessageResponse({
+                  message_id: "message-0",
+                  sender_type: "user",
+                  message_text: "もっと古いメッセージです。",
+                  status: "completed",
+                  ai_feedback: null,
+                  created_at: olderCreatedAt,
+                }),
+              ],
+            })
+          );
+        }
+
+        throw new Error(`Unhandled request: ${method} ${url}`);
+      })
+    );
+
+    renderTopRoute();
+
+    const oldestMessage = await screen.findByText("もっと古いメッセージです。");
+    const tiedUserMessage = screen.getByText("先に送った質問です。");
+    const tiedAiMessage = screen.getByText("後から届いたAI回答です。");
+
+    expect(
+      oldestMessage.compareDocumentPosition(tiedUserMessage) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      tiedUserMessage.compareDocumentPosition(tiedAiMessage) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(screen.getByText(formatTimestampLabel(olderCreatedAt))).toBeInTheDocument();
+    expect(screen.getAllByText(formatTimestampLabel(tiedCreatedAt)).length).toBeGreaterThan(0);
+    expect(screen.queryByText("表示可能")).not.toBeInTheDocument();
   });
 
   it("falls back to the draft pane when no chats exist", async () => {

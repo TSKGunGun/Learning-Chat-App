@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import type { Database } from "@/db/client";
 import { chatChannels, messages } from "@/db/schema";
@@ -103,7 +103,11 @@ export class DrizzleMessageGateway implements MessageGateway {
       })
       .from(messages)
       .where(eq(messages.channelId, channelId))
-      .orderBy(asc(messages.createdAt));
+      .orderBy(
+        asc(messages.createdAt),
+        desc(messages.senderType),
+        asc(messages.id)
+      );
 
     return rows.map(mapChatMessage);
   }
@@ -131,7 +135,11 @@ export class DrizzleMessageGateway implements MessageGateway {
           eq(chatChannels.isDeleted, false)
         )
       )
-      .orderBy(asc(messages.createdAt));
+      .orderBy(
+        asc(messages.createdAt),
+        desc(messages.senderType),
+        asc(messages.id)
+      );
 
     return rows.map(mapChatMessage);
   }

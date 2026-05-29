@@ -9,6 +9,7 @@ export interface ChatChannelListItemViewModel {
 export interface ChatMessageViewModel {
   readonly id: string;
   readonly authorLabel: string;
+  readonly createdAtLabel: string;
   readonly body: string;
   readonly statusLabel: string;
   readonly feedbackAvailable: boolean;

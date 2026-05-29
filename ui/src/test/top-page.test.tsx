@@ -5,6 +5,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TopPage } from "@/presentation/pages/top/top-page";
 import type { TopPageViewModel } from "@/interface-adapters/view-models/view-models";
 
+const formatTimestampLabel = (value: string) =>
+  new Intl.DateTimeFormat("ja-JP", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+
 function createViewModel(
   overrides: Partial<TopPageViewModel> = {}
 ): TopPageViewModel {
@@ -41,6 +49,7 @@ function createViewModel(
         {
           id: "message-1",
           authorLabel: "あなた",
+          createdAtLabel: formatTimestampLabel("2026-05-28T09:45:00.000Z"),
           body: "先週の学習内容を整理してください。",
           statusLabel: "表示可能",
           feedbackAvailable: false,
@@ -166,6 +175,7 @@ describe("TopPage", () => {
               {
                 id: "pending-message",
                 authorLabel: "AI",
+                createdAtLabel: formatTimestampLabel("2026-05-28T10:01:00.000Z"),
                 body: "AI回答生成中",
                 statusLabel: "AI回答生成中",
                 feedbackAvailable: false,
@@ -196,5 +206,49 @@ describe("TopPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Pending AI response already exists."
     );
+  });
+
+  it("shows message timestamps and does not render the completed status label", () => {
+    const olderTimestamp = formatTimestampLabel("2026-05-28T09:45:00.000Z");
+    const newerTimestamp = formatTimestampLabel("2026-05-28T10:00:00.000Z");
+
+    render(
+      <TopPage
+        viewModel={createViewModel({
+          activePane: {
+            ...createViewModel().activePane,
+            messages: [
+              {
+                id: "message-1",
+                authorLabel: "あなた",
+                createdAtLabel: olderTimestamp,
+                body: "古いメッセージ",
+                statusLabel: "表示可能",
+                feedbackAvailable: false,
+              },
+              {
+                id: "message-2",
+                authorLabel: "AI",
+                createdAtLabel: newerTimestamp,
+                body: "新しいメッセージ",
+                statusLabel: "表示可能",
+                feedbackAvailable: true,
+              },
+            ],
+          },
+        })}
+        isBusy={false}
+        onStartNewChat={vi.fn()}
+        onSelectChat={vi.fn()}
+        onDeleteChat={vi.fn()}
+        onComposerTextChange={vi.fn()}
+        onMessageSubmit={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText(olderTimestamp).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(newerTimestamp).length).toBeGreaterThan(0);
+    expect(screen.queryByText("表示可能")).not.toBeInTheDocument();
   });
 });

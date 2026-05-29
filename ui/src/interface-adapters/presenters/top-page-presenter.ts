@@ -30,6 +30,36 @@ const formatLastMessagedAt = (value: string) => {
   }).format(date);
 };
 
+const compareMessageCreatedAtAscending = (
+  left: ChatDetail["messages"][number],
+  right: ChatDetail["messages"][number]
+): number => {
+  const leftTime = new Date(left.createdAt).getTime();
+  const rightTime = new Date(right.createdAt).getTime();
+
+  if (Number.isNaN(leftTime) && Number.isNaN(rightTime)) {
+    return 0;
+  }
+
+  if (Number.isNaN(leftTime)) {
+    return -1;
+  }
+
+  if (Number.isNaN(rightTime)) {
+    return 1;
+  }
+
+  if (leftTime !== rightTime) {
+    return leftTime - rightTime;
+  }
+
+  if (left.senderType !== right.senderType) {
+    return left.senderType === "user" ? -1 : 1;
+  }
+
+  return left.id.localeCompare(right.id);
+};
+
 const resolvePaneDescription = (selection: ChatSelection) =>
   selection.type === "new"
     ? "最初のメッセージを送信するまでは未保存の新規チャットとして扱われます。"
@@ -84,14 +114,17 @@ export class TopPagePresenter {
           workspace.selection.type === "new"
             ? "ここから新しい会話を始められます。"
             : "まだメッセージはありません。",
-        messages: (workspace.activeChat?.messages ?? []).map((message) => ({
-          id: message.id,
-          authorLabel: message.senderType === "ai" ? "AI" : "あなた",
-          body: message.body ?? formatStatusLabel(message.status),
-          statusLabel: formatStatusLabel(message.status),
-          feedbackAvailable:
-            message.senderType === "ai" && message.status === "completed",
-        })),
+        messages: [...(workspace.activeChat?.messages ?? [])]
+          .sort(compareMessageCreatedAtAscending)
+          .map((message) => ({
+            id: message.id,
+            authorLabel: message.senderType === "ai" ? "AI" : "あなた",
+            createdAtLabel: formatLastMessagedAt(message.createdAt),
+            body: message.body ?? formatStatusLabel(message.status),
+            statusLabel: formatStatusLabel(message.status),
+            feedbackAvailable:
+              message.senderType === "ai" && message.status === "completed",
+          })),
         composer: {
           value: options.composerText,
           inputPlaceholder: "メッセージを入力",
