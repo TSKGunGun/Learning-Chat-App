@@ -48,10 +48,12 @@ function createViewModel(
       messages: [
         {
           id: "message-1",
+          senderKind: "user",
           authorLabel: "あなた",
           createdAtLabel: formatTimestampLabel("2026-05-28T09:45:00.000Z"),
           body: "先週の学習内容を整理してください。",
           statusLabel: "表示可能",
+          isPending: false,
           feedbackAvailable: false,
         },
       ],
@@ -174,10 +176,12 @@ describe("TopPage", () => {
             messages: [
               {
                 id: "pending-message",
+                senderKind: "ai",
                 authorLabel: "AI",
                 createdAtLabel: formatTimestampLabel("2026-05-28T10:01:00.000Z"),
                 body: "AI回答生成中",
                 statusLabel: "AI回答生成中",
+                isPending: true,
                 feedbackAvailable: false,
               },
             ],
@@ -206,9 +210,14 @@ describe("TopPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Pending AI response already exists."
     );
+    expect(screen.getByTestId("pending-message-loader")).toBeInTheDocument();
+    expect(screen.getByText("AI").closest("article")).toHaveClass(
+      "bg-amber-50",
+      "border-amber-100"
+    );
   });
 
-  it("shows message timestamps and does not render the completed status label", () => {
+  it("shows sender icons, sender colors, and does not render the completed status label", () => {
     const olderTimestamp = formatTimestampLabel("2026-05-28T09:45:00.000Z");
     const newerTimestamp = formatTimestampLabel("2026-05-28T10:00:00.000Z");
 
@@ -220,18 +229,22 @@ describe("TopPage", () => {
             messages: [
               {
                 id: "message-1",
+                senderKind: "user",
                 authorLabel: "あなた",
                 createdAtLabel: olderTimestamp,
                 body: "古いメッセージ",
                 statusLabel: "表示可能",
+                isPending: false,
                 feedbackAvailable: false,
               },
               {
                 id: "message-2",
+                senderKind: "ai",
                 authorLabel: "AI",
                 createdAtLabel: newerTimestamp,
                 body: "新しいメッセージ",
                 statusLabel: "表示可能",
+                isPending: false,
                 feedbackAvailable: true,
               },
             ],
@@ -249,6 +262,26 @@ describe("TopPage", () => {
 
     expect(screen.getAllByText(olderTimestamp).length).toBeGreaterThan(0);
     expect(screen.getAllByText(newerTimestamp).length).toBeGreaterThan(0);
+    expect(screen.getByText("あなた").closest("article")).toHaveClass(
+      "bg-sky-50",
+      "border-sky-100"
+    );
+    expect(screen.getByText("AI").closest("article")).toHaveClass(
+      "bg-amber-50",
+      "border-amber-100"
+    );
+    expect(
+      screen
+        .getByText("あなた")
+        .closest("article")
+        ?.querySelector('svg.lucide-user-round')
+    ).not.toBeNull();
+    expect(
+      screen
+        .getByText("AI")
+        .closest("article")
+        ?.querySelector('svg.lucide-sparkles')
+    ).not.toBeNull();
     expect(screen.queryByText("表示可能")).not.toBeInTheDocument();
   });
 });

@@ -3,8 +3,10 @@ import {
   Menu,
   MessageSquareText,
   PenSquare,
+  Sparkles,
   ThumbsDown,
   ThumbsUp,
+  UserRound,
 } from "lucide-react";
 
 import { Button } from "@/presentation/atoms/button";
@@ -37,6 +39,30 @@ interface SidebarContentProps {
   readonly onStartNewChat: () => void;
   readonly onSelectChat: (channelId: string) => void;
   readonly onDeleteChat: (channelId: string) => void;
+}
+
+function PendingMessageIndicator({ label }: { readonly label: string }) {
+  return (
+    <div className="mt-3 flex items-center gap-3 text-sm text-muted-foreground">
+      <div
+        className="flex items-center gap-1"
+        aria-hidden="true"
+        data-testid="pending-message-loader"
+      >
+        {[0, 1, 2].map((index) => (
+          <span
+            key={index}
+            className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-300"
+            style={{
+              animationDelay: `${index * 180}ms`,
+              animationDuration: "1.1s",
+            }}
+          />
+        ))}
+      </div>
+      <span>{label}</span>
+    </div>
+  );
 }
 
 function SidebarContent({
@@ -83,6 +109,35 @@ function SidebarContent({
         )}
       </div>
     </Card>
+  );
+}
+
+function MessageAuthorBadge({
+  senderKind,
+  authorLabel,
+}: {
+  readonly senderKind: "user" | "ai";
+  readonly authorLabel: string;
+}) {
+  const isUser = senderKind === "user";
+
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className={
+          isUser
+            ? "flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-sky-700"
+            : "flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-700"
+        }
+      >
+        {isUser ? (
+          <UserRound className="h-4 w-4" aria-hidden="true" />
+        ) : (
+          <Sparkles className="h-4 w-4" aria-hidden="true" />
+        )}
+      </span>
+      <p className="text-sm font-semibold">{authorLabel}</p>
+    </div>
   );
 }
 
@@ -207,15 +262,26 @@ export function ChatWorkspacePreview({
             {viewModel.activePane.messages.map((message) => (
               <article
                 key={message.id}
-                className="rounded-2xl border border-border/80 bg-white/80 p-4"
+                className={
+                  message.senderKind === "user"
+                    ? "rounded-2xl border border-sky-100 bg-sky-50 p-4"
+                    : "rounded-2xl border border-amber-100 bg-amber-50 p-4"
+                }
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">{message.authorLabel}</p>
+                  <MessageAuthorBadge
+                    senderKind={message.senderKind}
+                    authorLabel={message.authorLabel}
+                  />
                   <span className="text-xs text-muted-foreground">
                     {message.createdAtLabel}
                   </span>
                 </div>
-                <p className="mt-3 text-sm leading-6">{message.body}</p>
+                {message.isPending ? (
+                  <PendingMessageIndicator label={message.body} />
+                ) : (
+                  <p className="mt-3 text-sm leading-6">{message.body}</p>
+                )}
                 {message.feedbackAvailable ? (
                   <div className="mt-4 flex gap-2">
                     <Button variant="outline" size="sm" type="button">

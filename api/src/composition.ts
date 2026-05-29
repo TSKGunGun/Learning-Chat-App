@@ -6,9 +6,9 @@ import { DrizzleMessageGateway } from "@/gateways/drizzle-message-gateway";
 import { DrizzleSessionGateway } from "@/gateways/drizzle-session-gateway";
 import { DrizzleUserGateway } from "@/gateways/drizzle-user-gateway";
 import { SafeFallbackChannelNameGenerator } from "@/gateways/fallback-channel-name-generator";
-import { SafeFallbackChatCompletionGateway } from "@/gateways/fallback-chat-completion-gateway";
 import { NoopChannelNameGeneratorGateway } from "@/gateways/noop-gateways";
 import { OpenAiChannelNameGenerator } from "@/gateways/openai-channel-name-generator";
+import { OpenAiChatCompletionGateway } from "@/gateways/openai-chat-completion-gateway";
 import type { SessionGateway } from "@/gateways/session-gateway";
 import { AiReplyLifecycleService } from "@/services/ai-reply-lifecycle-service";
 import { SystemClock } from "@/shared/clock";
@@ -44,8 +44,11 @@ export const createAppComposition = (): AppComposition => {
   const messageGateway = new DrizzleMessageGateway(database);
   const clock = new SystemClock();
   const idGenerator = new CryptoIdGenerator();
-  const chatCompletionGateway = new SafeFallbackChatCompletionGateway();
   const openAiApiKey = getOpenAiApiKey();
+  const chatCompletionGateway = new OpenAiChatCompletionGateway({
+    apiKey: openAiApiKey ?? "",
+    model: getOpenAiChatModel(),
+  });
   const primaryChannelNameGenerator = openAiApiKey
     ? new OpenAiChannelNameGenerator({
         apiKey: openAiApiKey,

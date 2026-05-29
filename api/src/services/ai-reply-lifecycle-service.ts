@@ -18,6 +18,13 @@ interface AiReplyLifecycleServiceDependencies {
 
 const AI_TIMEOUT_MESSAGE = "AI応答がありません";
 const DEFAULT_TIMEOUT_MILLISECONDS = 60_000;
+const AI_REPLY_SYSTEM_PROMPT = [
+  "あなたは親しみやすく、会話しやすいAIアシスタントです。",
+  "フレンドリーで自然な日本語で答えてください。",
+  "ユーザーに寄り添いながら、創造性をやや高めにして考えてください。",
+  "ただし過度に脱線せず、直近のユーザーの質問や依頼に正面から役立つ回答を返してください。",
+  "必要に応じて具体例や提案を出して構いません。",
+].join("\n");
 
 const toConversationHistory = (
   messages: ReadonlyArray<ChatMessage>
@@ -72,6 +79,7 @@ export class AiReplyLifecycleService {
       const completionPromise =
         this.dependencies.chatCompletionGateway.generateReply({
           conversationHistory: toConversationHistory(command.conversationHistory),
+          systemPrompt: AI_REPLY_SYSTEM_PROMPT,
           userId: command.authenticatedUserId,
           channelId: command.channelId,
           metadata: {

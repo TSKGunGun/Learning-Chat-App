@@ -118,10 +118,12 @@ export class TopPagePresenter {
           .sort(compareMessageCreatedAtAscending)
           .map((message) => ({
             id: message.id,
+            senderKind: message.senderType,
             authorLabel: message.senderType === "ai" ? "AI" : "あなた",
             createdAtLabel: formatLastMessagedAt(message.createdAt),
             body: message.body ?? formatStatusLabel(message.status),
             statusLabel: formatStatusLabel(message.status),
+            isPending: message.status === "pending",
             feedbackAvailable:
               message.senderType === "ai" && message.status === "completed",
           })),
