@@ -1,12 +1,11 @@
-import type { ChatCompletionGateway } from "@/gateways/chat-completion-gateway";
 import type {
   ChannelNameGeneratorGateway,
   GenerateChannelNameInput,
 } from "@/gateways/channel-name-generator-gateway";
 
-const CHANNEL_NAME_MAX_LENGTH = 60;
+export const CHANNEL_NAME_MAX_LENGTH = 60;
 
-const buildDeterministicFallback = (messageText: string): string => {
+export const buildDeterministicFallback = (messageText: string): string => {
   const firstLine = messageText.split("\n")[0] ?? messageText;
   const normalizedFirstLine = firstLine.trim().replace(/\s+/g, " ");
   const summary = normalizedFirstLine
@@ -16,7 +15,7 @@ const buildDeterministicFallback = (messageText: string): string => {
   return summary.length > 0 ? summary : "新しいチャット";
 };
 
-const normalizeGeneratedTitle = (value: string): string => {
+export const normalizeGeneratedTitle = (value: string): string => {
   const normalizedTitle = value.trim().replace(/^["'「『]|["'」』]$/g, "");
 
   if (normalizedTitle.length === 0) {
@@ -27,7 +26,7 @@ const normalizeGeneratedTitle = (value: string): string => {
 };
 
 interface SafeFallbackChannelNameGeneratorDependencies {
-  readonly chatCompletionGateway: ChatCompletionGateway;
+  readonly primaryGenerator: ChannelNameGeneratorGateway;
 }
 
 export class SafeFallbackChannelNameGenerator
@@ -42,20 +41,7 @@ export class SafeFallbackChannelNameGenerator
   ): Promise<string> {
     try {
       const generatedName =
-        await this.dependencies.chatCompletionGateway.generateReply({
-          conversationHistory: [
-            {
-              role: "user",
-              content: input.firstMessageText,
-            },
-          ],
-          systemPrompt:
-            "Generate a short Japanese chat channel title from the first user message.",
-          userId: input.userId,
-          metadata: {
-            intent: "channel_name",
-          },
-        });
+        await this.dependencies.primaryGenerator.generateChannelName(input);
 
       return normalizeGeneratedTitle(generatedName);
     } catch {

@@ -1,5 +1,5 @@
 import { getRuntimeDatabase } from "@/db/client";
-import { getSessionTtlSeconds } from "@/db/env";
+import { getOpenAiApiKey, getOpenAiChatModel, getSessionTtlSeconds } from "@/db/env";
 import { BcryptPasswordHasher } from "@/gateways/bcrypt-password-hasher";
 import { DrizzleChatChannelGateway } from "@/gateways/drizzle-chat-channel-gateway";
 import { DrizzleMessageGateway } from "@/gateways/drizzle-message-gateway";
@@ -7,6 +7,8 @@ import { DrizzleSessionGateway } from "@/gateways/drizzle-session-gateway";
 import { DrizzleUserGateway } from "@/gateways/drizzle-user-gateway";
 import { SafeFallbackChannelNameGenerator } from "@/gateways/fallback-channel-name-generator";
 import { SafeFallbackChatCompletionGateway } from "@/gateways/fallback-chat-completion-gateway";
+import { NoopChannelNameGeneratorGateway } from "@/gateways/noop-gateways";
+import { OpenAiChannelNameGenerator } from "@/gateways/openai-channel-name-generator";
 import type { SessionGateway } from "@/gateways/session-gateway";
 import { AiReplyLifecycleService } from "@/services/ai-reply-lifecycle-service";
 import { SystemClock } from "@/shared/clock";
@@ -43,8 +45,15 @@ export const createAppComposition = (): AppComposition => {
   const clock = new SystemClock();
   const idGenerator = new CryptoIdGenerator();
   const chatCompletionGateway = new SafeFallbackChatCompletionGateway();
+  const openAiApiKey = getOpenAiApiKey();
+  const primaryChannelNameGenerator = openAiApiKey
+    ? new OpenAiChannelNameGenerator({
+        apiKey: openAiApiKey,
+        model: getOpenAiChatModel(),
+      })
+    : new NoopChannelNameGeneratorGateway();
   const channelNameGeneratorGateway = new SafeFallbackChannelNameGenerator({
-    chatCompletionGateway,
+    primaryGenerator: primaryChannelNameGenerator,
   });
   const aiReplyLifecycleService = new AiReplyLifecycleService({
     messageGateway,
