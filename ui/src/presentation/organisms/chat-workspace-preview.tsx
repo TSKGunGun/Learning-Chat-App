@@ -1,3 +1,4 @@
+import type { ChangeEvent, FormEvent } from "react";
 import {
   Menu,
   MessageSquareText,
@@ -25,6 +26,8 @@ interface ChatWorkspacePreviewProps {
   readonly onStartNewChat: () => void;
   readonly onSelectChat: (channelId: string) => void;
   readonly onDeleteChat: (channelId: string) => void;
+  readonly onComposerTextChange: (nextValue: string) => void;
+  readonly onMessageSubmit: () => void;
   readonly onDrawerOpenChange: (open: boolean) => void;
 }
 
@@ -84,28 +87,56 @@ function SidebarContent({
 }
 
 function MessageComposer({
+  value,
   inputPlaceholder,
   submitLabel,
+  errorMessage,
   isInputDisabled,
   isSubmitDisabled,
+  onValueChange,
+  onSubmit,
 }: {
+  readonly value: string;
   readonly inputPlaceholder: string;
   readonly submitLabel: string;
+  readonly errorMessage: string | null;
   readonly isInputDisabled: boolean;
   readonly isSubmitDisabled: boolean;
+  readonly onValueChange: (nextValue: string) => void;
+  readonly onSubmit: () => void;
 }) {
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onValueChange(event.target.value);
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSubmitDisabled) {
+      return;
+    }
+
+    onSubmit();
+  };
+
   return (
     <div className="mt-6 border-t border-border/80 pt-5">
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <form className="flex flex-col gap-3 sm:flex-row" onSubmit={handleSubmit}>
         <Input
           aria-label="メッセージ入力"
           placeholder={inputPlaceholder}
+          value={value}
+          onChange={handleChange}
           disabled={isInputDisabled}
         />
-        <Button type="button" disabled={isSubmitDisabled} className="sm:self-end">
+        <Button type="submit" disabled={isSubmitDisabled} className="sm:self-end">
           {submitLabel}
         </Button>
-      </div>
+      </form>
+      {errorMessage ? (
+        <p className="mt-3 text-sm text-destructive" role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -116,6 +147,8 @@ export function ChatWorkspacePreview({
   onStartNewChat,
   onSelectChat,
   onDeleteChat,
+  onComposerTextChange,
+  onMessageSubmit,
   onDrawerOpenChange,
 }: ChatWorkspacePreviewProps) {
   return (
@@ -179,7 +212,7 @@ export function ChatWorkspacePreview({
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold">{message.authorLabel}</p>
                   <span className="text-xs text-muted-foreground">
-                    {message.statusLabel}
+                    {message.createdAtLabel}
                   </span>
                 </div>
                 <p className="mt-3 text-sm leading-6">{message.body}</p>
@@ -213,10 +246,14 @@ export function ChatWorkspacePreview({
         )}
 
         <MessageComposer
+          value={viewModel.activePane.composer.value}
           inputPlaceholder={viewModel.activePane.composer.inputPlaceholder}
           submitLabel={viewModel.activePane.composer.submitLabel}
+          errorMessage={viewModel.activePane.composer.errorMessage}
           isInputDisabled={viewModel.activePane.composer.isInputDisabled || isBusy}
           isSubmitDisabled={viewModel.activePane.composer.isSubmitDisabled || isBusy}
+          onValueChange={onComposerTextChange}
+          onSubmit={onMessageSubmit}
         />
       </Card>
 

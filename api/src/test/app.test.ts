@@ -6,7 +6,15 @@ import type {
   ChatChannelGateway,
   CreateChatChannelInput,
 } from "@/gateways/chat-channel-gateway";
-import type { MessageGateway } from "@/gateways/message-gateway";
+import type {
+  ChannelNameGeneratorGateway,
+  GenerateChannelNameInput,
+} from "@/gateways/channel-name-generator-gateway";
+import type {
+  ChatCompletionGateway,
+  ChatCompletionRequest,
+} from "@/gateways/chat-completion-gateway";
+import type { MessageGateway, UpdateAiMessageInput } from "@/gateways/message-gateway";
 import type { AuthenticationUserRecord, UserGateway } from "@/gateways/user-gateway";
 import type { SessionGateway } from "@/gateways/session-gateway";
 import { BcryptPasswordHasher } from "@/gateways/bcrypt-password-hasher";
@@ -23,6 +31,10 @@ import { ListChatsUseCase } from "@/use-cases/list-chats-use-case";
 import { LoginUseCase } from "@/use-cases/login-use-case";
 import { SendMessageFeedbackUseCase } from "@/use-cases/send-message-feedback-use-case";
 import { SendMessageToChatUseCase } from "@/use-cases/send-message-to-chat-use-case";
+import { AiReplyLifecycleService } from "@/services/ai-reply-lifecycle-service";
+import type { Clock } from "@/shared/clock";
+import type { IdGenerator } from "@/shared/id-generator";
+import { PendingAiMessageAlreadyExistsError } from "@/shared/errors/application-error";
 
 const VALID_CHANNEL_ID = "22222222-2222-4222-8222-222222222222";
 const VALID_MESSAGE_ID = "33333333-3333-4333-8333-333333333333";
@@ -57,9 +69,19 @@ interface StoredChatChannel extends ChatChannel {
 
 interface ChatSliceTestContext {
   readonly chatChannelGateway: TestChatChannelGateway;
+  readonly messageGateway: TestMessageGateway;
   readonly listChatsUseCase: ListChatsUseCase;
   readonly getChatByIdUseCase: GetChatByIdUseCase;
   readonly deleteChatByIdUseCase: DeleteChatByIdUseCase;
+}
+
+interface MessageFlowTestContext {
+  readonly chatChannelGateway: TestChatChannelGateway;
+  readonly messageGateway: TestMessageGateway;
+  readonly channelNameGeneratorGateway: TestChannelNameGeneratorGateway;
+  readonly chatCompletionGateway: TestChatCompletionGateway;
+  readonly createChatUseCase: CreateChatWithFirstMessageUseCase;
+  readonly sendMessageToChatUseCase: SendMessageToChatUseCase;
 }
 
 const hashSessionToken = (sessionToken: string): string =>
@@ -151,6 +173,7 @@ class TestSessionGateway implements SessionGateway {
 }
 
 class TestChatChannelGateway implements ChatChannelGateway {
+  public readonly createdChannels: CreateChatChannelInput[] = [];
   public readonly deletedChannelIds: string[] = [];
   public readonly lastMessagedAtUpdates: Array<{
     readonly userId: string;
@@ -165,6 +188,21 @@ class TestChatChannelGateway implements ChatChannelGateway {
       id: channel.id,
       name: channel.name,
       lastMessagedAt: channel.lastMessagedAt,
+    };
+  }
+
+  public setLastMessagedAt(channelId: string, lastMessagedAt: string): void {
+    const channelIndex = this.channels.findIndex(
+      (candidate) => candidate.id === channelId
+    );
+
+    if (channelIndex === -1) {
+      return;
+    }
+
+    this.channels[channelIndex] = {
+      ...this.channels[channelIndex],
+      lastMessagedAt,
     };
   }
 
@@ -198,6 +236,15 @@ class TestChatChannelGateway implements ChatChannelGateway {
   }
 
   public async create(channel: CreateChatChannelInput): Promise<ChatChannel> {
+    this.createdChannels.push(channel);
+    this.channels.push({
+      id: channel.id,
+      userId: channel.userId,
+      name: channel.name,
+      lastMessagedAt: channel.lastMessagedAt,
+      isDeleted: false,
+    });
+
     return {
       id: channel.id,
       name: channel.name,
@@ -257,15 +304,23 @@ class TestChatChannelGateway implements ChatChannelGateway {
 }
 
 class TestMessageGateway implements MessageGateway {
+  public readonly createdMessages: ChatMessage[] = [];
+  public readonly updatedAiMessages: Array<{
+    readonly messageId: string;
+    readonly status: "completed" | "ai_timeout";
+    readonly messageText: string;
+  }> = [];
+
   public constructor(
-    private readonly messagesByChannelId: ReadonlyMap<string, ReadonlyArray<ChatMessage>>
+    private readonly messagesByChannelId: Map<string, ChatMessage[]>,
+    private readonly chatChannelGateway: TestChatChannelGateway
   ) {}
 
   public async listByChannelId(
     channelId: string
   ): Promise<ReadonlyArray<ChatMessage>> {
-    return [...(this.messagesByChannelId.get(channelId) ?? [])].sort((left, right) =>
-      left.createdAt.localeCompare(right.createdAt)
+    return [...(this.messagesByChannelId.get(channelId) ?? [])].sort(
+      (left, right) => left.createdAt.localeCompare(right.createdAt)
     );
   }
 
@@ -279,7 +334,84 @@ class TestMessageGateway implements MessageGateway {
   }
 
   public async createMessage(message: ChatMessage): Promise<ChatMessage> {
+    this.createdMessages.push(message);
+    const existingMessages = this.messagesByChannelId.get(message.channelId) ?? [];
+
+    existingMessages.push(message);
+    this.messagesByChannelId.set(message.channelId, existingMessages);
+
     return message;
+  }
+
+  public async appendUserMessageWithPendingAiMessage(input: {
+    readonly channelId: string;
+    readonly userMessage: ChatMessage;
+    readonly pendingAiMessage: ChatMessage;
+  }): Promise<{
+    readonly userMessage: ChatMessage;
+    readonly pendingAiMessage: ChatMessage;
+  }> {
+    const existingMessages = this.messagesByChannelId.get(input.channelId) ?? [];
+    const hasPendingAiMessage = existingMessages.some(
+      (message) =>
+        message.senderType === "ai" && message.status === "pending"
+    );
+
+    if (hasPendingAiMessage) {
+      throw new PendingAiMessageAlreadyExistsError();
+    }
+
+    this.createdMessages.push(input.userMessage, input.pendingAiMessage);
+    this.messagesByChannelId.set(input.channelId, [
+      ...existingMessages,
+      input.userMessage,
+      input.pendingAiMessage,
+    ]);
+    this.chatChannelGateway.setLastMessagedAt(
+      input.channelId,
+      input.pendingAiMessage.createdAt
+    );
+
+    return {
+      userMessage: input.userMessage,
+      pendingAiMessage: input.pendingAiMessage,
+    };
+  }
+
+  public async updateAiMessage(
+    messageId: string,
+    input: UpdateAiMessageInput
+  ): Promise<void> {
+    for (const [channelId, channelMessages] of this.messagesByChannelId.entries()) {
+      const messageIndex = channelMessages.findIndex(
+        (message) => message.id === messageId
+      );
+
+      if (messageIndex === -1) {
+        continue;
+      }
+
+      this.updatedAiMessages.push({
+        messageId,
+        status: input.status,
+        messageText: input.messageText,
+      });
+      this.chatChannelGateway.setLastMessagedAt(
+        input.channelId,
+        input.lastMessagedAt
+      );
+      this.messagesByChannelId.set(channelId, [
+        ...channelMessages.slice(0, messageIndex),
+        {
+          ...channelMessages[messageIndex],
+          status: input.status,
+          messageText: input.messageText,
+        },
+        ...channelMessages.slice(messageIndex + 1),
+      ]);
+
+      return;
+    }
   }
 
   public async updateMessageFeedback(
@@ -288,6 +420,68 @@ class TestMessageGateway implements MessageGateway {
   ): Promise<void> {
     void _messageId;
     void _feedback;
+  }
+}
+
+class SequenceClock implements Clock {
+  private lastValue = "2026-05-29T00:00:00.000Z";
+
+  public constructor(private readonly values: string[]) {}
+
+  public now(): Date {
+    const nextValue = this.values.shift() ?? this.lastValue;
+
+    this.lastValue = nextValue;
+
+    return new Date(nextValue);
+  }
+}
+
+class StubIdGenerator implements IdGenerator {
+  public constructor(private readonly values: string[]) {}
+
+  public generate(): string {
+    const nextValue = this.values.shift();
+
+    if (!nextValue) {
+      throw new Error("Expected StubIdGenerator to have another value.");
+    }
+
+    return nextValue;
+  }
+}
+
+class TestChannelNameGeneratorGateway
+  implements ChannelNameGeneratorGateway
+{
+  public readonly calls: GenerateChannelNameInput[] = [];
+
+  public constructor(private readonly channelName: string) {}
+
+  public async generateChannelName(
+    input: GenerateChannelNameInput
+  ): Promise<string> {
+    this.calls.push(input);
+
+    return this.channelName;
+  }
+}
+
+class TestChatCompletionGateway implements ChatCompletionGateway {
+  public readonly calls: ChatCompletionRequest[] = [];
+
+  public constructor(
+    private readonly replyFactory: (
+      request: ChatCompletionRequest
+    ) => Promise<string>
+  ) {}
+
+  public async generateReply(
+    request: ChatCompletionRequest
+  ): Promise<string> {
+    this.calls.push(request);
+
+    return this.replyFactory(request);
   }
 }
 
@@ -413,7 +607,7 @@ const createChatSliceTestContext = (): ChatSliceTestContext => {
     },
   ]);
   const messageGateway = new TestMessageGateway(
-    new Map<string, ReadonlyArray<ChatMessage>>([
+    new Map<string, ChatMessage[]>([
       [
         VALID_CHANNEL_ID,
         [
@@ -461,10 +655,13 @@ const createChatSliceTestContext = (): ChatSliceTestContext => {
         ],
       ],
     ])
+    ,
+    chatChannelGateway
   );
 
   return {
     chatChannelGateway,
+    messageGateway,
     listChatsUseCase: new ListChatsUseCase({
       chatChannelGateway,
     }),
@@ -476,6 +673,99 @@ const createChatSliceTestContext = (): ChatSliceTestContext => {
       chatChannelGateway,
     }),
   };
+};
+
+const createMessageFlowTestContext = ({
+  channelName = "AI Summary Channel",
+  replyFactory = async () => "AI generated reply",
+  clockValues = [
+    "2026-05-29T00:00:00.000Z",
+    "2026-05-29T00:00:01.000Z",
+    "2026-05-29T00:00:02.000Z",
+    "2026-05-29T00:00:03.000Z",
+  ],
+  generatedIds = [
+    "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+    "bbbbbbb2-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+    "ccccccc3-cccc-4ccc-8ccc-ccccccccccc3",
+  ],
+  channels = [
+    {
+      id: VALID_CHANNEL_ID,
+      userId: TEST_USER_ID,
+      name: "Project Kickoff",
+      lastMessagedAt: "2026-05-28T10:30:00.000Z",
+    },
+  ] satisfies StoredChatChannel[],
+  messagesByChannelId = new Map<string, ChatMessage[]>([
+    [
+      VALID_CHANNEL_ID,
+      [
+        {
+          id: VALID_MESSAGE_ID,
+          channelId: VALID_CHANNEL_ID,
+          senderType: "user",
+          messageText: "Need help with the kickoff doc.",
+          status: "completed",
+          aiFeedback: null,
+          createdAt: "2026-05-28T10:30:00.000Z",
+        },
+      ],
+    ],
+  ]),
+}: {
+  readonly channelName?: string;
+  readonly replyFactory?: (
+    request: ChatCompletionRequest
+  ) => Promise<string>;
+  readonly clockValues?: string[];
+  readonly generatedIds?: string[];
+  readonly channels?: StoredChatChannel[];
+  readonly messagesByChannelId?: Map<string, ChatMessage[]>;
+} = {}): MessageFlowTestContext => {
+  const chatChannelGateway = new TestChatChannelGateway([...channels]);
+  const messageGateway = new TestMessageGateway(
+    messagesByChannelId,
+    chatChannelGateway
+  );
+  const clock = new SequenceClock([...clockValues]);
+  const idGenerator = new StubIdGenerator([...generatedIds]);
+  const chatCompletionGateway = new TestChatCompletionGateway(replyFactory);
+  const channelNameGeneratorGateway = new TestChannelNameGeneratorGateway(
+    channelName
+  );
+  const aiReplyLifecycleService = new AiReplyLifecycleService({
+    messageGateway,
+    chatCompletionGateway,
+    clock,
+  });
+
+  return {
+    chatChannelGateway,
+    messageGateway,
+    channelNameGeneratorGateway,
+    chatCompletionGateway,
+    createChatUseCase: new CreateChatWithFirstMessageUseCase({
+      chatChannelGateway,
+      messageGateway,
+      aiReplyLifecycleService,
+      channelNameGeneratorGateway,
+      clock,
+      idGenerator,
+    }),
+    sendMessageToChatUseCase: new SendMessageToChatUseCase({
+      chatChannelGateway,
+      messageGateway,
+      aiReplyLifecycleService,
+      clock,
+      idGenerator,
+    }),
+  };
+};
+
+const flushMicrotasks = async (): Promise<void> => {
+  await Promise.resolve();
+  await Promise.resolve();
 };
 
 describe("API auth persistence", () => {
@@ -1050,49 +1340,510 @@ describe("API auth persistence", () => {
     expect(chatChannelGateway.deletedChannelIds).toEqual([]);
   });
 
+  it("creates a chat, stores the first user message, and completes the AI reply lifecycle", async () => {
+    const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const {
+      chatChannelGateway,
+      messageGateway,
+      channelNameGeneratorGateway,
+      chatCompletionGateway,
+      createChatUseCase,
+    } = createMessageFlowTestContext({
+      channelName: "AI要約タイトル",
+      replyFactory: async () => "生成済みのAI回答",
+      clockValues: [
+        "2026-05-29T00:00:00.000Z",
+        "2026-05-29T00:00:01.000Z",
+        "2026-05-29T00:00:02.000Z",
+      ],
+      generatedIds: [
+        "10101010-1010-4010-8010-101010101010",
+        "20202020-2020-4020-8020-202020202020",
+        "30303030-3030-4030-8030-303030303030",
+      ],
+      channels: [],
+      messagesByChannelId: new Map<string, ChatMessage[]>(),
+    });
+    const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+    const app = createApiApp({
+      loginUseCase,
+      sessionGateway,
+      createChatUseCase,
+    });
+    const response = await app.request("http://localhost/api/chats", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: `session=${sessionToken}`,
+      },
+      body: JSON.stringify({
+        message_text: "最初の相談内容です",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      channel_id: "10101010-1010-4010-8010-101010101010",
+      channel_name: "AI要約タイトル",
+      message_id: "20202020-2020-4020-8020-202020202020",
+      sender_type: "user",
+      message_text: "最初の相談内容です",
+      status: "completed",
+      created_at: "2026-05-29T00:00:00.000Z",
+    });
+
+    await flushMicrotasks();
+
+    expect(channelNameGeneratorGateway.calls).toEqual([
+      {
+        firstMessageText: "最初の相談内容です",
+        userId: TEST_USER_ID,
+      },
+    ]);
+    expect(chatChannelGateway.createdChannels).toEqual([
+      {
+        id: "10101010-1010-4010-8010-101010101010",
+        userId: TEST_USER_ID,
+        name: "AI要約タイトル",
+        lastMessagedAt: "2026-05-29T00:00:00.000Z",
+      },
+    ]);
+    expect(chatCompletionGateway.calls).toHaveLength(1);
+    expect(chatCompletionGateway.calls[0]?.conversationHistory).toEqual([
+      {
+        role: "user",
+        content: "最初の相談内容です",
+      },
+    ]);
+
+    const storedMessages = await messageGateway.listByChannelId(
+      "10101010-1010-4010-8010-101010101010"
+    );
+
+    expect(storedMessages).toEqual([
+      {
+        id: "20202020-2020-4020-8020-202020202020",
+        channelId: "10101010-1010-4010-8010-101010101010",
+        senderType: "user",
+        messageText: "最初の相談内容です",
+        status: "completed",
+        aiFeedback: null,
+        createdAt: "2026-05-29T00:00:00.000Z",
+      },
+      {
+        id: "30303030-3030-4030-8030-303030303030",
+        channelId: "10101010-1010-4010-8010-101010101010",
+        senderType: "ai",
+        messageText: "生成済みのAI回答",
+        status: "completed",
+        aiFeedback: null,
+        createdAt: "2026-05-29T00:00:01.000Z",
+      },
+    ]);
+    await expect(
+      chatChannelGateway.findActiveOwnedById(
+        TEST_USER_ID,
+        "10101010-1010-4010-8010-101010101010"
+      )
+    ).resolves.toEqual({
+      id: "10101010-1010-4010-8010-101010101010",
+      name: "AI要約タイトル",
+      lastMessagedAt: "2026-05-29T00:00:02.000Z",
+    });
+  });
+
+  it("sends a message to an existing chat and updates the pending message to completed", async () => {
+    const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const { chatChannelGateway, messageGateway, sendMessageToChatUseCase } =
+      createMessageFlowTestContext({
+        replyFactory: async () => "後続のAI回答",
+        clockValues: [
+          "2026-05-29T01:00:00.000Z",
+          "2026-05-29T01:00:01.000Z",
+          "2026-05-29T01:00:02.000Z",
+        ],
+        generatedIds: [
+          "40404040-4040-4040-8040-404040404040",
+          "50505050-5050-4050-8050-505050505050",
+        ],
+      });
+    const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+    const app = createApiApp({
+      loginUseCase,
+      sessionGateway,
+      sendMessageToChatUseCase,
+    });
+    const response = await app.request(
+      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: `session=${sessionToken}`,
+        },
+        body: JSON.stringify({
+          message_text: "続きの質問を送ります",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      channel_name: "Project Kickoff",
+      message_id: "40404040-4040-4040-8040-404040404040",
+      sender_type: "user",
+      message_text: "続きの質問を送ります",
+      status: "completed",
+      created_at: "2026-05-29T01:00:00.000Z",
+    });
+
+    await flushMicrotasks();
+
+    const storedMessages = await messageGateway.listByChannelId(VALID_CHANNEL_ID);
+
+    expect(storedMessages).toEqual([
+      {
+        id: VALID_MESSAGE_ID,
+        channelId: VALID_CHANNEL_ID,
+        senderType: "user",
+        messageText: "Need help with the kickoff doc.",
+        status: "completed",
+        aiFeedback: null,
+        createdAt: "2026-05-28T10:30:00.000Z",
+      },
+      {
+        id: "40404040-4040-4040-8040-404040404040",
+        channelId: VALID_CHANNEL_ID,
+        senderType: "user",
+        messageText: "続きの質問を送ります",
+        status: "completed",
+        aiFeedback: null,
+        createdAt: "2026-05-29T01:00:00.000Z",
+      },
+      {
+        id: "50505050-5050-4050-8050-505050505050",
+        channelId: VALID_CHANNEL_ID,
+        senderType: "ai",
+        messageText: "後続のAI回答",
+        status: "completed",
+        aiFeedback: null,
+        createdAt: "2026-05-29T01:00:01.000Z",
+      },
+    ]);
+    await expect(
+      chatChannelGateway.findActiveOwnedById(TEST_USER_ID, VALID_CHANNEL_ID)
+    ).resolves.toEqual({
+      id: VALID_CHANNEL_ID,
+      name: "Project Kickoff",
+      lastMessagedAt: "2026-05-29T01:00:02.000Z",
+    });
+  });
+
+  it("returns 422 when an existing chat already has a pending AI response", async () => {
+    const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const { chatChannelGateway, messageGateway, sendMessageToChatUseCase } =
+      createMessageFlowTestContext({
+        messagesByChannelId: new Map<string, ChatMessage[]>([
+          [
+            VALID_CHANNEL_ID,
+            [
+              {
+                id: VALID_MESSAGE_ID,
+                channelId: VALID_CHANNEL_ID,
+                senderType: "user",
+                messageText: "Need help with the kickoff doc.",
+                status: "completed",
+                aiFeedback: null,
+                createdAt: "2026-05-28T10:30:00.000Z",
+              },
+              {
+                id: SECOND_MESSAGE_ID,
+                channelId: VALID_CHANNEL_ID,
+                senderType: "ai",
+                messageText: null,
+                status: "pending",
+                aiFeedback: null,
+                createdAt: "2026-05-28T10:31:00.000Z",
+              },
+            ],
+          ],
+        ]),
+      });
+    const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+    const app = createApiApp({
+      loginUseCase,
+      sessionGateway,
+      sendMessageToChatUseCase,
+    });
+    const response = await app.request(
+      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: `session=${sessionToken}`,
+        },
+        body: JSON.stringify({
+          message_text: "この送信は拒否されるはずです",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      message: "Pending AI response already exists.",
+    });
+    expect(messageGateway.createdMessages).toEqual([]);
+    expect(chatChannelGateway.lastMessagedAtUpdates).toEqual([]);
+  });
+
   it.each([
     [
-      "POST",
-      "http://localhost/api/chats",
-      JSON.stringify({ message_text: "hello scaffold" }),
-      501,
+      "other user channel",
+      OTHER_CHANNEL_ID,
+      [
+        {
+          id: VALID_CHANNEL_ID,
+          userId: TEST_USER_ID,
+          name: "Project Kickoff",
+          lastMessagedAt: "2026-05-28T10:30:00.000Z",
+        },
+      ] satisfies StoredChatChannel[],
     ],
     [
-      "POST",
-      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages`,
-      JSON.stringify({ message_text: "hello scaffold" }),
-      501,
-    ],
-    [
-      "POST",
-      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages/${VALID_MESSAGE_ID}/feedback`,
-      JSON.stringify({ ai_feedback: true }),
-      501,
+      "deleted channel",
+      VALID_CHANNEL_ID,
+      [
+        {
+          id: VALID_CHANNEL_ID,
+          userId: TEST_USER_ID,
+          name: "Deleted Channel",
+          lastMessagedAt: "2026-05-28T10:30:00.000Z",
+          isDeleted: true,
+        },
+      ] satisfies StoredChatChannel[],
     ],
   ])(
-    "keeps scaffold responses for authenticated %s %s",
-    async (method, url, body, expectedStatus) => {
+    "returns 404 when sending to a non-visible existing chat: %s",
+    async (_label, channelId, channels) => {
       const { loginUseCase, sessionGateway } = await createAuthTestContext();
+      const { sendMessageToChatUseCase } = createMessageFlowTestContext({
+        channels,
+      });
       const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
       const app = createApiApp({
         loginUseCase,
         sessionGateway,
+        sendMessageToChatUseCase,
+      });
+      const response = await app.request(
+        `http://localhost/api/chats/${channelId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: `session=${sessionToken}`,
+          },
+          body: JSON.stringify({
+            message_text: "送信できないチャットです",
+          }),
+        }
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        message: "Chat channel not found.",
+      });
+    }
+  );
+
+  it.each([
+    ["create", "http://localhost/api/chats"],
+    ["send", `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages`],
+  ])("returns 400 when %s request body is invalid JSON", async (_label, url) => {
+    const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const { createChatUseCase, sendMessageToChatUseCase } =
+      createMessageFlowTestContext();
+    const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+    const app = createApiApp({
+      loginUseCase,
+      sessionGateway,
+      createChatUseCase,
+      sendMessageToChatUseCase,
+    });
+    const response = await app.request(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: `session=${sessionToken}`,
+      },
+      body: "{invalid-json",
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      message: "Request body must be valid JSON.",
+    });
+  });
+
+  it.each([
+    [
+      "create",
+      "http://localhost/api/chats",
+      JSON.stringify({}),
+      "message_text is required.",
+    ],
+    [
+      "send",
+      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages`,
+      JSON.stringify({}),
+      "message_text is required.",
+    ],
+    [
+      "send invalid uuid",
+      "http://localhost/api/chats/not-a-uuid/messages",
+      JSON.stringify({ message_text: "hello" }),
+      "channel_id must be a valid UUID.",
+    ],
+  ])(
+    "returns 400 for invalid create/send input: %s",
+    async (_label, url, body, expectedMessage) => {
+      const { loginUseCase, sessionGateway } = await createAuthTestContext();
+      const { createChatUseCase, sendMessageToChatUseCase } =
+        createMessageFlowTestContext();
+      const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+      const app = createApiApp({
+        loginUseCase,
+        sessionGateway,
+        createChatUseCase,
+        sendMessageToChatUseCase,
       });
       const response = await app.request(url, {
-        method,
+        method: "POST",
         headers: {
-          ...(body === undefined ? {} : { "content-type": "application/json" }),
+          "content-type": "application/json",
           cookie: `session=${sessionToken}`,
         },
         body,
       });
 
-      expect(response.status).toBe(expectedStatus);
-      await expect(response.json()).resolves.toMatchObject({
-        message: expect.stringContaining("is not implemented yet."),
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        message: expectedMessage,
       });
     }
   );
+
+  it("updates the pending AI message to ai_timeout after 60 seconds", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { loginUseCase, sessionGateway } = await createAuthTestContext();
+      const { chatChannelGateway, messageGateway, sendMessageToChatUseCase } =
+        createMessageFlowTestContext({
+          replyFactory: async () => await new Promise<string>(() => {}),
+          clockValues: [
+            "2026-05-29T02:00:00.000Z",
+            "2026-05-29T02:00:01.000Z",
+            "2026-05-29T02:01:00.000Z",
+          ],
+          generatedIds: [
+            "60606060-6060-4060-8060-606060606060",
+            "70707070-7070-4070-8070-707070707070",
+          ],
+        });
+      const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+      const app = createApiApp({
+        loginUseCase,
+        sessionGateway,
+        sendMessageToChatUseCase,
+      });
+      const response = await app.request(
+        `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: `session=${sessionToken}`,
+          },
+          body: JSON.stringify({
+            message_text: "タイムアウト確認",
+          }),
+        }
+      );
+
+      expect(response.status).toBe(200);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      await flushMicrotasks();
+
+      const storedMessages = await messageGateway.listByChannelId(VALID_CHANNEL_ID);
+
+      expect(storedMessages).toEqual([
+        {
+          id: VALID_MESSAGE_ID,
+          channelId: VALID_CHANNEL_ID,
+          senderType: "user",
+          messageText: "Need help with the kickoff doc.",
+          status: "completed",
+          aiFeedback: null,
+          createdAt: "2026-05-28T10:30:00.000Z",
+        },
+        {
+          id: "60606060-6060-4060-8060-606060606060",
+          channelId: VALID_CHANNEL_ID,
+          senderType: "user",
+          messageText: "タイムアウト確認",
+          status: "completed",
+          aiFeedback: null,
+          createdAt: "2026-05-29T02:00:00.000Z",
+        },
+        {
+          id: "70707070-7070-4070-8070-707070707070",
+          channelId: VALID_CHANNEL_ID,
+          senderType: "ai",
+          messageText: "AI応答がありません",
+          status: "ai_timeout",
+          aiFeedback: null,
+          createdAt: "2026-05-29T02:00:01.000Z",
+        },
+      ]);
+      await expect(
+        chatChannelGateway.findActiveOwnedById(TEST_USER_ID, VALID_CHANNEL_ID)
+      ).resolves.toEqual({
+        id: VALID_CHANNEL_ID,
+        name: "Project Kickoff",
+        lastMessagedAt: "2026-05-29T02:01:00.000Z",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps scaffold response for authenticated feedback requests", async () => {
+    const { loginUseCase, sessionGateway } = await createAuthTestContext();
+    const sessionToken = await sessionGateway.createSession(TEST_USER_ID);
+    const app = createApiApp({
+      loginUseCase,
+      sessionGateway,
+    });
+    const response = await app.request(
+      `http://localhost/api/chats/${VALID_CHANNEL_ID}/messages/${VALID_MESSAGE_ID}/feedback`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: `session=${sessionToken}`,
+        },
+        body: JSON.stringify({ ai_feedback: true }),
+      }
+    );
+
+    expect(response.status).toBe(501);
+    await expect(response.json()).resolves.toMatchObject({
+      message: expect.stringContaining("is not implemented yet."),
+    });
+  });
 
   it("returns 400 when ai_feedback is not a boolean", async () => {
     const { loginUseCase, sessionGateway } = await createAuthTestContext();

@@ -1,4 +1,15 @@
-import { NotImplementedApplicationError } from "@/shared/errors/application-error";
+import type { ChatChannelGateway } from "@/gateways/chat-channel-gateway";
+import type { ChannelNameGeneratorGateway } from "@/gateways/channel-name-generator-gateway";
+import type { MessageGateway } from "@/gateways/message-gateway";
+import {
+  NoopChannelNameGeneratorGateway,
+  NoopChatChannelGateway,
+  NoopMessageGateway,
+} from "@/gateways/noop-gateways";
+import type { AiReplyLifecycleService } from "@/services/ai-reply-lifecycle-service";
+import type { Clock } from "@/shared/clock";
+import type { IdGenerator } from "@/shared/id-generator";
+import { ApplicationError } from "@/shared/errors/application-error";
 
 export interface CreateChatWithFirstMessageCommand {
   readonly authenticatedUserId: string;
@@ -15,14 +26,103 @@ export interface CreateChatWithFirstMessageResult {
   readonly createdAt: string;
 }
 
+interface CreateChatWithFirstMessageUseCaseDependencies {
+  readonly chatChannelGateway: ChatChannelGateway;
+  readonly messageGateway: MessageGateway;
+  readonly aiReplyLifecycleService: AiReplyLifecycleService;
+  readonly channelNameGeneratorGateway: ChannelNameGeneratorGateway;
+  readonly clock: Clock;
+  readonly idGenerator: IdGenerator;
+}
+
 export class CreateChatWithFirstMessageUseCase {
+  private readonly chatChannelGateway: ChatChannelGateway;
+  private readonly messageGateway: MessageGateway;
+  private readonly aiReplyLifecycleService?: AiReplyLifecycleService;
+  private readonly channelNameGeneratorGateway: ChannelNameGeneratorGateway;
+  private readonly clock?: Clock;
+  private readonly idGenerator?: IdGenerator;
+
+  public constructor(
+    dependencies: Partial<CreateChatWithFirstMessageUseCaseDependencies> = {}
+  ) {
+    this.chatChannelGateway =
+      dependencies.chatChannelGateway ?? new NoopChatChannelGateway();
+    this.messageGateway = dependencies.messageGateway ?? new NoopMessageGateway();
+    this.aiReplyLifecycleService = dependencies.aiReplyLifecycleService;
+    this.channelNameGeneratorGateway =
+      dependencies.channelNameGeneratorGateway ??
+      new NoopChannelNameGeneratorGateway();
+    this.clock = dependencies.clock;
+    this.idGenerator = dependencies.idGenerator;
+  }
+
   public async execute(
     command: CreateChatWithFirstMessageCommand
   ): Promise<CreateChatWithFirstMessageResult> {
-    void command;
+    if (
+      !this.aiReplyLifecycleService ||
+      !this.clock ||
+      !this.idGenerator
+    ) {
+      throw new ApplicationError(
+        "POST /api/chats is not implemented yet.",
+        501
+      );
+    }
 
-    throw new NotImplementedApplicationError(
-      "POST /api/chats is not implemented yet."
-    );
+    const createdAt = this.clock.now().toISOString();
+    const pendingCreatedAt = this.clock.now().toISOString();
+    const channelId = this.idGenerator.generate();
+    const messageId = this.idGenerator.generate();
+    const pendingMessageId = this.idGenerator.generate();
+    const channelName =
+      await this.channelNameGeneratorGateway.generateChannelName({
+        firstMessageText: command.messageText,
+        userId: command.authenticatedUserId,
+      });
+
+    await this.chatChannelGateway.create({
+      id: channelId,
+      userId: command.authenticatedUserId,
+      name: channelName,
+      lastMessagedAt: createdAt,
+    });
+    await this.messageGateway.appendUserMessageWithPendingAiMessage({
+      channelId,
+      userMessage: {
+        id: messageId,
+        channelId,
+        senderType: "user",
+        messageText: command.messageText,
+        status: "completed",
+        aiFeedback: null,
+        createdAt,
+      },
+      pendingAiMessage: {
+        id: pendingMessageId,
+        channelId,
+        senderType: "ai",
+        messageText: null,
+        status: "pending",
+        aiFeedback: null,
+        createdAt: pendingCreatedAt,
+      },
+    });
+    await this.aiReplyLifecycleService.start({
+      authenticatedUserId: command.authenticatedUserId,
+      channelId,
+      pendingMessageId,
+    });
+
+    return {
+      channelId,
+      channelName,
+      messageId,
+      senderType: "user",
+      messageText: command.messageText,
+      status: "completed",
+      createdAt,
+    };
   }
 }

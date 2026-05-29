@@ -7,4 +7,5 @@ export interface ChatMessage {
   readonly body: string | null;
   readonly status: MessageStatus;
   readonly aiFeedback: boolean | null;
+  readonly createdAt: string;
 }

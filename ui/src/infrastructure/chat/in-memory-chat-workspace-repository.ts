@@ -1,6 +1,7 @@
 import type { ChatWorkspaceRepository } from "@/application/ports/chat-workspace-repository";
 import type { ChatChannelSummary } from "@/entities/chat/chat-channel-summary";
 import type { ChatDetail } from "@/entities/chat/chat-detail";
+import type { ChatMessage } from "@/entities/chat/chat-message";
 
 interface StoredChatDetail extends ChatDetail {
   readonly isDeleted: boolean;
@@ -25,6 +26,7 @@ const CHAT_DETAILS: ReadonlyArray<StoredChatDetail> = [
         body: "訂正ルールの見直し観点を整理したいです。",
         status: "completed",
         aiFeedback: null,
+        createdAt: "2026-05-28T09:43:00.000Z",
       },
       {
         id: "b8ad7ba0-a891-4997-80a1-93a8ff58f487",
@@ -32,6 +34,7 @@ const CHAT_DETAILS: ReadonlyArray<StoredChatDetail> = [
         body: "過去の訂正履歴から再発しやすい指摘をまとめて確認しましょう。",
         status: "completed",
         aiFeedback: true,
+        createdAt: "2026-05-28T09:45:00.000Z",
       },
     ],
   },
@@ -47,6 +50,7 @@ const CHAT_DETAILS: ReadonlyArray<StoredChatDetail> = [
         body: "モバイルのドロワー表示も今回の範囲に含めたいです。",
         status: "completed",
         aiFeedback: null,
+        createdAt: "2026-05-27T12:10:00.000Z",
       },
       {
         id: "9fca65af-ebf3-4296-b20d-b19614f6ec31",
@@ -54,6 +58,7 @@ const CHAT_DETAILS: ReadonlyArray<StoredChatDetail> = [
         body: "一覧操作を優先しつつ、モバイルではドロワー型サイドバーへ切り替えます。",
         status: "completed",
         aiFeedback: false,
+        createdAt: "2026-05-27T12:15:00.000Z",
       },
     ],
   },
@@ -69,6 +74,7 @@ const CHAT_DETAILS: ReadonlyArray<StoredChatDetail> = [
         body: "ポーリング対象の見せ方も確認したいです。",
         status: "completed",
         aiFeedback: null,
+        createdAt: "2026-05-26T06:25:00.000Z",
       },
       {
         id: "7ac241f5-d9f2-4221-ad04-7f0c1d6641c5",
@@ -76,10 +82,23 @@ const CHAT_DETAILS: ReadonlyArray<StoredChatDetail> = [
         body: null,
         status: "pending",
         aiFeedback: null,
+        createdAt: "2026-05-26T06:30:00.000Z",
       },
     ],
   },
 ];
+
+const createStoredUserMessage = (
+  body: string,
+  createdAt: string
+): ChatMessage => ({
+  id: crypto.randomUUID(),
+  senderType: "user",
+  body,
+  status: "completed",
+  aiFeedback: null,
+  createdAt,
+});
 
 const toSummary = (detail: StoredChatDetail): ChatChannelSummary => ({
   id: detail.channelId,
@@ -119,6 +138,57 @@ export class InMemoryChatWorkspaceRepository
       channelName: detailCopy.channelName,
       lastMessagedAt: detailCopy.lastMessagedAt,
       messages: detailCopy.messages,
+    };
+  }
+
+  public async createChatWithFirstMessage(messageText: string) {
+    const createdAt = new Date().toISOString();
+    const channelId = crypto.randomUUID();
+    const message = createStoredUserMessage(messageText, createdAt);
+    const nextDetail: StoredChatDetail = {
+      channelId,
+      channelName: messageText.trim() || "新規チャット",
+      lastMessagedAt: createdAt,
+      isDeleted: false,
+      messages: [message],
+    };
+
+    this.chatDetails = [nextDetail, ...this.chatDetails];
+
+    return {
+      channelId,
+      channelName: nextDetail.channelName,
+      message,
+    };
+  }
+
+  public async sendMessageToChat(channelId: string, messageText: string) {
+    const createdAt = new Date().toISOString();
+    const message = createStoredUserMessage(messageText, createdAt);
+    let submittedChannelName: string | null = null;
+
+    this.chatDetails = this.chatDetails.map((detail) => {
+      if (detail.channelId !== channelId || detail.isDeleted) {
+        return detail;
+      }
+
+      submittedChannelName = detail.channelName;
+
+      return {
+        ...detail,
+        lastMessagedAt: createdAt,
+        messages: [...detail.messages, message],
+      };
+    });
+
+    if (submittedChannelName === null) {
+      throw new Error("指定したチャットが見つかりません。");
+    }
+
+    return {
+      channelId,
+      channelName: submittedChannelName,
+      message,
     };
   }
 

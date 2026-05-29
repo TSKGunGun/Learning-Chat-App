@@ -481,15 +481,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description スキャフォールド段階のため未実装 */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
         };
     };
     getChatById: {
@@ -662,15 +653,6 @@ export interface operations {
             };
             /** @description 対象チャット内に pending の AI メッセージが存在するなど、業務条件に違反 */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description スキャフォールド段階のため未実装 */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };

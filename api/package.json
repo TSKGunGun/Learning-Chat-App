@@ -16,11 +16,12 @@
     "db:seed": "cross-env TMPDIR=.tmp node --import tsx ./src/db/seed.ts"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.3",
     "@hono/node-server": "^2.0.3",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.7",
     "hono": "^4.12.21",
+    "openai": "^6.39.1",
     "pg": "^8.16.3"
   },
   "devDependencies": {

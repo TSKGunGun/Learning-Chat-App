@@ -2,11 +2,20 @@ import type {
   ChatChannelGateway,
   CreateChatChannelInput,
 } from "@/gateways/chat-channel-gateway";
+import type {
+  ChannelNameGeneratorGateway,
+  GenerateChannelNameInput,
+} from "@/gateways/channel-name-generator-gateway";
 import type { ChatCompletionGateway } from "@/gateways/chat-completion-gateway";
 import type { ChatCompletionRequest } from "@/gateways/chat-completion-gateway";
 import type { CorrectionRuleGateway } from "@/gateways/correction-rule-gateway";
 import type { EmbeddingGateway } from "@/gateways/embedding-gateway";
-import type { MessageGateway } from "@/gateways/message-gateway";
+import type {
+  AppendedChatMessages,
+  AppendUserMessageWithPendingAiMessageInput,
+  MessageGateway,
+  UpdateAiMessageInput,
+} from "@/gateways/message-gateway";
 import type { PasswordHasher } from "@/gateways/password-hasher";
 import type { SessionGateway } from "@/gateways/session-gateway";
 import type { UserGateway } from "@/gateways/user-gateway";
@@ -123,8 +132,30 @@ export class NoopMessageGateway implements MessageGateway {
     );
   }
 
+  public async appendUserMessageWithPendingAiMessage(
+    _input: AppendUserMessageWithPendingAiMessageInput
+  ): Promise<AppendedChatMessages> {
+    void _input;
+
+    throw new NotImplementedApplicationError(
+      "Message persistence is not implemented yet."
+    );
+  }
+
   public async createMessage(_message: ChatMessage): Promise<ChatMessage> {
     void _message;
+
+    throw new NotImplementedApplicationError(
+      "Message persistence is not implemented yet."
+    );
+  }
+
+  public async updateAiMessage(
+    _messageId: string,
+    _input: UpdateAiMessageInput
+  ): Promise<void> {
+    void _messageId;
+    void _input;
 
     throw new NotImplementedApplicationError(
       "Message persistence is not implemented yet."
@@ -140,6 +171,20 @@ export class NoopMessageGateway implements MessageGateway {
 
     throw new NotImplementedApplicationError(
       "Message persistence is not implemented yet."
+    );
+  }
+}
+
+export class NoopChannelNameGeneratorGateway
+  implements ChannelNameGeneratorGateway
+{
+  public async generateChannelName(
+    _input: GenerateChannelNameInput
+  ): Promise<string> {
+    void _input;
+
+    throw new NotImplementedApplicationError(
+      "Channel name generation is not implemented yet."
     );
   }
 }

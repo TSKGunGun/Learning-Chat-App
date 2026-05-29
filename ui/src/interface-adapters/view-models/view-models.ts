@@ -9,6 +9,7 @@ export interface ChatChannelListItemViewModel {
 export interface ChatMessageViewModel {
   readonly id: string;
   readonly authorLabel: string;
+  readonly createdAtLabel: string;
   readonly body: string;
   readonly statusLabel: string;
   readonly feedbackAvailable: boolean;
@@ -22,8 +23,10 @@ export interface TopPageSidebarViewModel {
 }
 
 export interface TopPageComposerViewModel {
+  readonly value: string;
   readonly inputPlaceholder: string;
   readonly submitLabel: string;
+  readonly errorMessage: string | null;
   readonly isInputDisabled: boolean;
   readonly isSubmitDisabled: boolean;
 }

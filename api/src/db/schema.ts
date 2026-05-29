@@ -103,6 +103,9 @@ export const messages = pgTable(
       table.channelId,
       table.createdAt
     ),
+    uniqueIndex("messages_pending_ai_per_channel_idx")
+      .on(table.channelId)
+      .where(sql`${table.senderType} = 'ai' and ${table.status} = 'pending'`),
     check(
       "messages_sender_type_check",
       sql`${table.senderType} in ('user', 'ai')`

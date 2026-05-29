@@ -37,6 +37,14 @@ export const requireEnvironmentVariable = (name: string): string => {
   return value;
 };
 
+export const getOptionalEnvironmentVariable = (name: string): string | null => {
+  loadEnvironment();
+
+  const value = process.env[name]?.trim();
+
+  return value && value.length > 0 ? value : null;
+};
+
 export interface DevSeedConfig {
   readonly username: string;
   readonly password: string;
@@ -70,6 +78,12 @@ export const getSessionTtlSeconds = (): number => {
 
   return ttlSeconds;
 };
+
+export const getOpenAiApiKey = (): string | null =>
+  getOptionalEnvironmentVariable("OPENAI_API_KEY");
+
+export const getOpenAiChatModel = (): string =>
+  getOptionalEnvironmentVariable("OPENAI_CHAT_MODEL") ?? "gpt-4o";
 
 export const getDevSeedConfig = (): DevSeedConfig => {
   return {
