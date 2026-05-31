@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type {
   ChatWorkspaceRepository,
+  SubmittedMessageFeedback,
   SubmittedUserMessage,
 } from "@/application/ports/chat-workspace-repository";
 import { LoadTopPageWorkspaceUseCase } from "@/application/use-cases/load-top-page-workspace-use-case";
@@ -29,6 +30,10 @@ class EmptyChatWorkspaceRepository implements ChatWorkspaceRepository {
     throw new Error("not implemented");
   }
 
+  public async sendMessageFeedback(): Promise<SubmittedMessageFeedback> {
+    throw new Error("not implemented");
+  }
+
   public async deleteChatById(): Promise<void> {}
 }
 
@@ -52,6 +57,10 @@ class FlakyChatWorkspaceRepository implements ChatWorkspaceRepository {
   }
 
   public async sendMessageToChat(): Promise<SubmittedUserMessage> {
+    throw new Error("not implemented");
+  }
+
+  public async sendMessageFeedback(): Promise<SubmittedMessageFeedback> {
     throw new Error("not implemented");
   }
 

@@ -30,6 +30,10 @@ interface ChatWorkspacePreviewProps {
   readonly onDeleteChat: (channelId: string) => void;
   readonly onComposerTextChange: (nextValue: string) => void;
   readonly onMessageSubmit: () => void;
+  readonly onMessageFeedbackSubmit: (
+    messageId: string,
+    aiFeedback: boolean
+  ) => void;
   readonly onDrawerOpenChange: (open: boolean) => void;
 }
 
@@ -144,6 +148,7 @@ function MessageAuthorBadge({
 function MessageComposer({
   value,
   inputPlaceholder,
+  helperText,
   submitLabel,
   errorMessage,
   isInputDisabled,
@@ -153,6 +158,7 @@ function MessageComposer({
 }: {
   readonly value: string;
   readonly inputPlaceholder: string;
+  readonly helperText: string;
   readonly submitLabel: string;
   readonly errorMessage: string | null;
   readonly isInputDisabled: boolean;
@@ -187,6 +193,7 @@ function MessageComposer({
           {submitLabel}
         </Button>
       </form>
+      <p className="mt-3 text-sm text-muted-foreground">{helperText}</p>
       {errorMessage ? (
         <p className="mt-3 text-sm text-destructive" role="alert">
           {errorMessage}
@@ -204,6 +211,7 @@ export function ChatWorkspacePreview({
   onDeleteChat,
   onComposerTextChange,
   onMessageSubmit,
+  onMessageFeedbackSubmit,
   onDrawerOpenChange,
 }: ChatWorkspacePreviewProps) {
   return (
@@ -284,15 +292,46 @@ export function ChatWorkspacePreview({
                 )}
                 {message.feedbackAvailable ? (
                   <div className="mt-4 flex gap-2">
-                    <Button variant="outline" size="sm" type="button">
+                    <Button
+                      variant={message.isGoodFeedbackActive ? "secondary" : "outline"}
+                      size="sm"
+                      type="button"
+                      className={
+                        message.isGoodFeedbackActive
+                          ? "border-emerald-200 bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
+                          : undefined
+                      }
+                      disabled={message.isFeedbackSubmitting}
+                      onClick={() =>
+                        onMessageFeedbackSubmit(message.id, true)
+                      }
+                    >
                       <ThumbsUp className="h-4 w-4" aria-hidden="true" />
-                      Good
+                      {message.goodFeedbackLabel}
                     </Button>
-                    <Button variant="outline" size="sm" type="button">
+                    <Button
+                      variant={message.isBadFeedbackActive ? "secondary" : "outline"}
+                      size="sm"
+                      type="button"
+                      className={
+                        message.isBadFeedbackActive
+                          ? "border-rose-200 bg-rose-100 text-rose-900 hover:bg-rose-100"
+                          : undefined
+                      }
+                      disabled={message.isFeedbackSubmitting}
+                      onClick={() =>
+                        onMessageFeedbackSubmit(message.id, false)
+                      }
+                    >
                       <ThumbsDown className="h-4 w-4" aria-hidden="true" />
-                      Bad
+                      {message.badFeedbackLabel}
                     </Button>
                   </div>
+                ) : null}
+                {message.feedbackErrorMessage ? (
+                  <p className="mt-3 text-sm text-destructive" role="alert">
+                    {message.feedbackErrorMessage}
+                  </p>
                 ) : null}
               </article>
             ))}
@@ -314,6 +353,7 @@ export function ChatWorkspacePreview({
         <MessageComposer
           value={viewModel.activePane.composer.value}
           inputPlaceholder={viewModel.activePane.composer.inputPlaceholder}
+          helperText={viewModel.activePane.composer.helperText}
           submitLabel={viewModel.activePane.composer.submitLabel}
           errorMessage={viewModel.activePane.composer.errorMessage}
           isInputDisabled={viewModel.activePane.composer.isInputDisabled || isBusy}

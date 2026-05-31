@@ -1,5 +1,6 @@
 import type {
   ChatWorkspaceRepository,
+  SubmittedMessageFeedback,
   SubmittedUserMessage,
 } from "@/application/ports/chat-workspace-repository";
 import type { ChatChannelSummary } from "@/entities/chat/chat-channel-summary";
@@ -48,6 +49,11 @@ interface UserMessageResponseBody {
   readonly message_text: string;
   readonly status: "completed";
   readonly created_at: string;
+}
+
+interface MessageFeedbackResponseBody {
+  readonly message_id: string;
+  readonly ai_feedback?: boolean | null;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -102,6 +108,15 @@ const isUserMessageResponseBody = (
   typeof value.message_text === "string" &&
   value.status === "completed" &&
   typeof value.created_at === "string";
+
+const isMessageFeedbackResponseBody = (
+  value: unknown
+): value is MessageFeedbackResponseBody =>
+  isRecord(value) &&
+  typeof value.message_id === "string" &&
+  (typeof value.ai_feedback === "boolean" ||
+    value.ai_feedback === null ||
+    typeof value.ai_feedback === "undefined");
 
 const readErrorMessage = async (response: Response): Promise<string | null> => {
   const contentType = response.headers.get("content-type");
@@ -190,6 +205,13 @@ const mapSubmittedUserMessage = (
     },
   };
 };
+
+const mapSubmittedMessageFeedback = (
+  responseBody: MessageFeedbackResponseBody
+): SubmittedMessageFeedback => ({
+  messageId: responseBody.message_id,
+  aiFeedback: responseBody.ai_feedback ?? null,
+});
 
 export class HttpChatWorkspaceRepository implements ChatWorkspaceRepository {
   public async listChats(): Promise<ReadonlyArray<ChatChannelSummary>> {
@@ -314,6 +336,44 @@ export class HttpChatWorkspaceRepository implements ChatWorkspaceRepository {
     }
 
     return mapSubmittedUserMessage(payload, channelId);
+  }
+
+  public async sendMessageFeedback(
+    channelId: string,
+    messageId: string,
+    aiFeedback: boolean
+  ): Promise<SubmittedMessageFeedback> {
+    const response = await fetch(
+      `/api/chats/${channelId}/messages/${messageId}/feedback`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          ai_feedback: aiFeedback,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw await createRequestError(
+        response,
+        "フィードバックの送信に失敗しました。"
+      );
+    }
+
+    const payload = await parseJsonPayload(
+      response,
+      "フィードバック送信レスポンスを読み取れませんでした。"
+    );
+
+    if (!isMessageFeedbackResponseBody(payload)) {
+      throw new RequestFailedError(
+        "フィードバック送信レスポンスの形式が不正です。"
+      );
+    }
+
+    return mapSubmittedMessageFeedback(payload);
   }
 
   public async deleteChatById(channelId: string): Promise<void> {

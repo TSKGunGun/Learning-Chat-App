@@ -15,6 +15,13 @@ export interface ChatMessageViewModel {
   readonly statusLabel: string;
   readonly isPending: boolean;
   readonly feedbackAvailable: boolean;
+  readonly feedbackState: boolean | null;
+  readonly isGoodFeedbackActive: boolean;
+  readonly isBadFeedbackActive: boolean;
+  readonly isFeedbackSubmitting: boolean;
+  readonly feedbackErrorMessage: string | null;
+  readonly goodFeedbackLabel: string;
+  readonly badFeedbackLabel: string;
 }
 
 export interface TopPageSidebarViewModel {
@@ -27,6 +34,7 @@ export interface TopPageSidebarViewModel {
 export interface TopPageComposerViewModel {
   readonly value: string;
   readonly inputPlaceholder: string;
+  readonly helperText: string;
   readonly submitLabel: string;
   readonly errorMessage: string | null;
   readonly isInputDisabled: boolean;

@@ -6,6 +6,7 @@ import type {
   TopPageWorkspaceState,
 } from "@/application/use-cases/load-top-page-workspace-use-case";
 import type { ListChatChannelsUseCase } from "@/application/use-cases/list-chat-channels-use-case";
+import type { SendMessageFeedbackUseCase } from "@/application/use-cases/send-message-feedback-use-case";
 import type { SendMessageToChatUseCase } from "@/application/use-cases/send-message-to-chat-use-case";
 import {
   NEW_CHAT_SELECTION,
@@ -13,6 +14,7 @@ import {
 } from "@/application/use-cases/top-page-workspace-selection";
 import type { ChatChannelSummary } from "@/entities/chat/chat-channel-summary";
 import type { ChatDetail } from "@/entities/chat/chat-detail";
+import type { ChatMessage } from "@/entities/chat/chat-message";
 import type { TopPagePresenter } from "@/interface-adapters/presenters/top-page-presenter";
 import type { TopPageViewModel } from "@/interface-adapters/view-models/view-models";
 
@@ -27,12 +29,27 @@ const createActiveChatFromMessage = (
   messages,
 });
 
+const updateMessageFeedback = (
+  messages: ReadonlyArray<ChatMessage>,
+  messageId: string,
+  aiFeedback: boolean | null
+): ReadonlyArray<ChatMessage> =>
+  messages.map((message) =>
+    message.id === messageId
+      ? {
+          ...message,
+          aiFeedback,
+        }
+      : message
+  );
+
 export class TopPageController {
   public constructor(
     private readonly loadWorkspaceUseCase: LoadTopPageWorkspaceUseCase,
     private readonly listChatChannelsUseCase: ListChatChannelsUseCase,
     private readonly loadChatDetailUseCase: LoadChatDetailUseCase,
     private readonly createChatWithFirstMessageUseCase: CreateChatWithFirstMessageUseCase,
+    private readonly sendMessageFeedbackUseCase: SendMessageFeedbackUseCase,
     private readonly sendMessageToChatUseCase: SendMessageToChatUseCase,
     private readonly deleteChatUseCase: DeleteChatUseCase,
     private readonly presenter: TopPagePresenter
@@ -108,6 +125,38 @@ export class TopPageController {
     };
   }
 
+  public async submitMessageFeedback(
+    currentState: TopPageWorkspaceState,
+    messageId: string,
+    aiFeedback: boolean
+  ): Promise<TopPageWorkspaceState> {
+    if (
+      currentState.selection.type !== "existing" ||
+      currentState.activeChat === null
+    ) {
+      return currentState;
+    }
+
+    const result = await this.sendMessageFeedbackUseCase.execute(
+      currentState.selection.channelId,
+      messageId,
+      aiFeedback
+    );
+
+    return {
+      channels: currentState.channels,
+      selection: currentState.selection,
+      activeChat: {
+        ...currentState.activeChat,
+        messages: updateMessageFeedback(
+          currentState.activeChat.messages,
+          result.messageId,
+          result.aiFeedback
+        ),
+      },
+    };
+  }
+
   public async deleteChat(
     currentState: TopPageWorkspaceState,
     channelId: string
@@ -151,7 +200,9 @@ export class TopPageController {
     options: {
       readonly composerText: string;
       readonly composerErrorMessage: string | null;
+      readonly feedbackErrorMessages: Readonly<Record<string, string>>;
       readonly isDrawerOpen: boolean;
+      readonly submittingFeedbackMessageIds: ReadonlySet<string>;
       readonly isSubmittingMessage: boolean;
     }
   ): TopPageViewModel {

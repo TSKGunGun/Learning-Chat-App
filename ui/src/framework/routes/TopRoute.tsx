@@ -22,6 +22,7 @@ export function TopRoute() {
     selectChat,
     deleteChat,
     submitMessage,
+    submitMessageFeedback,
     updateComposerText,
     setDrawerOpen,
   } = useTopPageWorkspace();
@@ -53,6 +54,7 @@ export function TopRoute() {
       onDeleteChat={deleteChat}
       onComposerTextChange={updateComposerText}
       onMessageSubmit={submitMessage}
+      onMessageFeedbackSubmit={submitMessageFeedback}
       onDrawerOpenChange={setDrawerOpen}
     />
   );

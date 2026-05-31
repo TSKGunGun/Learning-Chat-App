@@ -12,6 +12,10 @@ interface TopPageProps {
   readonly onDeleteChat: (channelId: string) => void;
   readonly onComposerTextChange: (nextValue: string) => void;
   readonly onMessageSubmit: () => void;
+  readonly onMessageFeedbackSubmit: (
+    messageId: string,
+    aiFeedback: boolean
+  ) => void;
   readonly onDrawerOpenChange: (open: boolean) => void;
 }
 
@@ -23,6 +27,7 @@ export function TopPage({
   onDeleteChat,
   onComposerTextChange,
   onMessageSubmit,
+  onMessageFeedbackSubmit,
   onDrawerOpenChange,
 }: TopPageProps) {
   return (
@@ -38,6 +43,7 @@ export function TopPage({
         onDeleteChat={onDeleteChat}
         onComposerTextChange={onComposerTextChange}
         onMessageSubmit={onMessageSubmit}
+        onMessageFeedbackSubmit={onMessageFeedbackSubmit}
         onDrawerOpenChange={onDrawerOpenChange}
       />
     </WorkspacePageTemplate>
