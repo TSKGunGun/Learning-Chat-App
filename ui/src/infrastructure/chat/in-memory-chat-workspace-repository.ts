@@ -192,6 +192,51 @@ export class InMemoryChatWorkspaceRepository
     };
   }
 
+  public async sendMessageFeedback(
+    channelId: string,
+    messageId: string,
+    aiFeedback: boolean
+  ) {
+    let nextFeedback: boolean | null = null;
+    let matchedMessage = false;
+
+    this.chatDetails = this.chatDetails.map((detail) => {
+      if (detail.channelId !== channelId || detail.isDeleted) {
+        return detail;
+      }
+
+      return {
+        ...detail,
+        messages: detail.messages.map((message) => {
+          if (
+            message.id !== messageId ||
+            message.senderType !== "ai" ||
+            message.status !== "completed"
+          ) {
+            return message;
+          }
+
+          matchedMessage = true;
+          nextFeedback = message.aiFeedback === aiFeedback ? null : aiFeedback;
+
+          return {
+            ...message,
+            aiFeedback: nextFeedback,
+          };
+        }),
+      };
+    });
+
+    if (!matchedMessage) {
+      throw new Error("指定したフィードバック対象メッセージが見つかりません。");
+    }
+
+    return {
+      messageId,
+      aiFeedback: nextFeedback,
+    };
+  }
+
   public async deleteChatById(channelId: string): Promise<void> {
     this.chatDetails = this.chatDetails.map((detail) =>
       detail.channelId === channelId

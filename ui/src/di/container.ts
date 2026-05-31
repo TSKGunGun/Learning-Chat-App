@@ -6,6 +6,7 @@ import { LoadLoginPagePreviewUseCase } from "@/application/use-cases/load-login-
 import { LoadTopPageWorkspaceUseCase } from "@/application/use-cases/load-top-page-workspace-use-case";
 import { LoginWithCredentialsUseCase } from "@/application/use-cases/login-with-credentials-use-case";
 import { RequireAuthenticatedSessionUseCase } from "@/application/use-cases/require-authenticated-session-use-case";
+import { SendMessageFeedbackUseCase } from "@/application/use-cases/send-message-feedback-use-case";
 import { SendMessageToChatUseCase } from "@/application/use-cases/send-message-to-chat-use-case";
 import { HttpAuthenticationRepository } from "@/infrastructure/auth/http-authentication-repository";
 import { HttpChatWorkspaceRepository } from "@/infrastructure/chat/http-chat-workspace-repository";
@@ -26,6 +27,7 @@ export const container = {
     new ListChatChannelsUseCase(chatWorkspaceRepository),
     new LoadChatDetailUseCase(chatWorkspaceRepository),
     new CreateChatWithFirstMessageUseCase(chatWorkspaceRepository),
+    new SendMessageFeedbackUseCase(chatWorkspaceRepository),
     new SendMessageToChatUseCase(chatWorkspaceRepository),
     new DeleteChatUseCase(chatWorkspaceRepository),
     new TopPagePresenter()

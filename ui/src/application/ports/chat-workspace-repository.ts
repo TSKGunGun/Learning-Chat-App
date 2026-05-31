@@ -8,6 +8,11 @@ export interface SubmittedUserMessage {
   readonly message: ChatMessage;
 }
 
+export interface SubmittedMessageFeedback {
+  readonly messageId: string;
+  readonly aiFeedback: boolean | null;
+}
+
 export interface ChatWorkspaceRepository {
   listChats(): Promise<ReadonlyArray<ChatChannelSummary>>;
   getChatById(channelId: string): Promise<ChatDetail>;
@@ -16,5 +21,10 @@ export interface ChatWorkspaceRepository {
     channelId: string,
     messageText: string
   ): Promise<SubmittedUserMessage>;
+  sendMessageFeedback(
+    channelId: string,
+    messageId: string,
+    aiFeedback: boolean
+  ): Promise<SubmittedMessageFeedback>;
   deleteChatById(channelId: string): Promise<void>;
 }

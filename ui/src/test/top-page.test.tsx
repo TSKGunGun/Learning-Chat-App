@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -55,11 +55,20 @@ function createViewModel(
           statusLabel: "表示可能",
           isPending: false,
           feedbackAvailable: false,
+          feedbackState: null,
+          isGoodFeedbackActive: false,
+          isBadFeedbackActive: false,
+          isFeedbackSubmitting: false,
+          feedbackErrorMessage: null,
+          goodFeedbackLabel: "Good",
+          badFeedbackLabel: "Bad",
         },
       ],
       composer: {
         value: "",
         inputPlaceholder: "メッセージを入力",
+        helperText:
+          "AI の回答を訂正したい場合も、そのままメッセージとして送信できます。",
         submitLabel: "送信",
         errorMessage: null,
         isInputDisabled: false,
@@ -89,6 +98,7 @@ describe("TopPage", () => {
     const handleDeleteChat = vi.fn();
     const handleComposerTextChange = vi.fn();
     const handleMessageSubmit = vi.fn();
+    const handleMessageFeedbackSubmit = vi.fn();
 
     render(
       <TopPage
@@ -107,6 +117,7 @@ describe("TopPage", () => {
         onDeleteChat={handleDeleteChat}
         onComposerTextChange={handleComposerTextChange}
         onMessageSubmit={handleMessageSubmit}
+        onMessageFeedbackSubmit={handleMessageFeedbackSubmit}
         onDrawerOpenChange={vi.fn()}
       />
     );
@@ -139,6 +150,8 @@ describe("TopPage", () => {
             composer: {
               value: "",
               inputPlaceholder: "メッセージを入力",
+              helperText:
+                "AI の回答を訂正したい場合も、そのままメッセージとして送信できます。",
               submitLabel: "送信",
               errorMessage: null,
               isInputDisabled: false,
@@ -152,6 +165,7 @@ describe("TopPage", () => {
         onDeleteChat={vi.fn()}
         onComposerTextChange={vi.fn()}
         onMessageSubmit={vi.fn()}
+        onMessageFeedbackSubmit={vi.fn()}
         onDrawerOpenChange={vi.fn()}
       />
     );
@@ -183,11 +197,20 @@ describe("TopPage", () => {
                 statusLabel: "AI回答生成中",
                 isPending: true,
                 feedbackAvailable: false,
+                feedbackState: null,
+                isGoodFeedbackActive: false,
+                isBadFeedbackActive: false,
+                isFeedbackSubmitting: false,
+                feedbackErrorMessage: null,
+                goodFeedbackLabel: "Good",
+                badFeedbackLabel: "Bad",
               },
             ],
             composer: {
               value: "送信待ちメッセージ",
               inputPlaceholder: "メッセージを入力",
+              helperText:
+                "AI の回答を訂正したい場合も、そのままメッセージとして送信できます。",
               submitLabel: "送信",
               errorMessage: "Pending AI response already exists.",
               isInputDisabled: true,
@@ -201,6 +224,7 @@ describe("TopPage", () => {
         onDeleteChat={vi.fn()}
         onComposerTextChange={vi.fn()}
         onMessageSubmit={vi.fn()}
+        onMessageFeedbackSubmit={vi.fn()}
         onDrawerOpenChange={vi.fn()}
       />
     );
@@ -236,6 +260,13 @@ describe("TopPage", () => {
                 statusLabel: "表示可能",
                 isPending: false,
                 feedbackAvailable: false,
+                feedbackState: null,
+                isGoodFeedbackActive: false,
+                isBadFeedbackActive: false,
+                isFeedbackSubmitting: false,
+                feedbackErrorMessage: null,
+                goodFeedbackLabel: "Good",
+                badFeedbackLabel: "Bad",
               },
               {
                 id: "message-2",
@@ -246,6 +277,13 @@ describe("TopPage", () => {
                 statusLabel: "表示可能",
                 isPending: false,
                 feedbackAvailable: true,
+                feedbackState: true,
+                isGoodFeedbackActive: true,
+                isBadFeedbackActive: false,
+                isFeedbackSubmitting: false,
+                feedbackErrorMessage: null,
+                goodFeedbackLabel: "Good",
+                badFeedbackLabel: "Bad",
               },
             ],
           },
@@ -256,6 +294,7 @@ describe("TopPage", () => {
         onDeleteChat={vi.fn()}
         onComposerTextChange={vi.fn()}
         onMessageSubmit={vi.fn()}
+        onMessageFeedbackSubmit={vi.fn()}
         onDrawerOpenChange={vi.fn()}
       />
     );
@@ -283,5 +322,146 @@ describe("TopPage", () => {
         ?.querySelector('svg.lucide-sparkles')
     ).not.toBeNull();
     expect(screen.queryByText("表示可能")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "AI の回答を訂正したい場合も、そのままメッセージとして送信できます。"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("routes feedback actions and shows active feedback state only for completed ai messages", async () => {
+    const user = userEvent.setup();
+    const handleMessageFeedbackSubmit = vi.fn();
+
+    render(
+      <TopPage
+        viewModel={createViewModel({
+          activePane: {
+            ...createViewModel().activePane,
+            messages: [
+              {
+                id: "message-ai-completed",
+                senderKind: "ai",
+                authorLabel: "AI",
+                createdAtLabel: formatTimestampLabel("2026-05-28T10:00:00.000Z"),
+                body: "完了済みのAI回答です。",
+                statusLabel: "表示可能",
+                isPending: false,
+                feedbackAvailable: true,
+                feedbackState: false,
+                isGoodFeedbackActive: false,
+                isBadFeedbackActive: true,
+                isFeedbackSubmitting: false,
+                feedbackErrorMessage: null,
+                goodFeedbackLabel: "Good",
+                badFeedbackLabel: "Bad",
+              },
+              {
+                id: "message-ai-timeout",
+                senderKind: "ai",
+                authorLabel: "AI",
+                createdAtLabel: formatTimestampLabel("2026-05-28T10:01:00.000Z"),
+                body: "AI応答がありません",
+                statusLabel: "AI応答がありません",
+                isPending: false,
+                feedbackAvailable: false,
+                feedbackState: null,
+                isGoodFeedbackActive: false,
+                isBadFeedbackActive: false,
+                isFeedbackSubmitting: false,
+                feedbackErrorMessage: null,
+                goodFeedbackLabel: "Good",
+                badFeedbackLabel: "Bad",
+              },
+            ],
+          },
+        })}
+        isBusy={false}
+        onStartNewChat={vi.fn()}
+        onSelectChat={vi.fn()}
+        onDeleteChat={vi.fn()}
+        onComposerTextChange={vi.fn()}
+        onMessageSubmit={vi.fn()}
+        onMessageFeedbackSubmit={handleMessageFeedbackSubmit}
+        onDrawerOpenChange={vi.fn()}
+      />
+    );
+
+    const completedMessage = screen.getByText("完了済みのAI回答です。").closest("article");
+    const timeoutMessage = screen.getByText("AI応答がありません").closest("article");
+
+    expect(completedMessage).not.toBeNull();
+    expect(timeoutMessage).not.toBeNull();
+    expect(within(completedMessage as HTMLElement).getByRole("button", { name: "Good" })).toBeEnabled();
+    expect(within(completedMessage as HTMLElement).getByRole("button", { name: "Bad" })).toHaveClass(
+      "bg-rose-100"
+    );
+    expect(
+      within(timeoutMessage as HTMLElement).queryByRole("button", { name: "Good" })
+    ).not.toBeInTheDocument();
+    expect(
+      within(timeoutMessage as HTMLElement).queryByRole("button", { name: "Bad" })
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      within(completedMessage as HTMLElement).getByRole("button", { name: "Good" })
+    );
+    await user.click(
+      within(completedMessage as HTMLElement).getByRole("button", { name: "Bad" })
+    );
+
+    expect(handleMessageFeedbackSubmit).toHaveBeenNthCalledWith(
+      1,
+      "message-ai-completed",
+      true
+    );
+    expect(handleMessageFeedbackSubmit).toHaveBeenNthCalledWith(
+      2,
+      "message-ai-completed",
+      false
+    );
+  });
+
+  it("shows a message-level feedback error and disables feedback buttons while submitting", () => {
+    render(
+      <TopPage
+        viewModel={createViewModel({
+          activePane: {
+            ...createViewModel().activePane,
+            messages: [
+              {
+                id: "message-ai-completed",
+                senderKind: "ai",
+                authorLabel: "AI",
+                createdAtLabel: formatTimestampLabel("2026-05-28T10:00:00.000Z"),
+                body: "完了済みのAI回答です。",
+                statusLabel: "表示可能",
+                isPending: false,
+                feedbackAvailable: true,
+                feedbackState: null,
+                isGoodFeedbackActive: false,
+                isBadFeedbackActive: false,
+                isFeedbackSubmitting: true,
+                feedbackErrorMessage: "フィードバックの送信に失敗しました。",
+                goodFeedbackLabel: "Good",
+                badFeedbackLabel: "Bad",
+              },
+            ],
+          },
+        })}
+        isBusy={false}
+        onStartNewChat={vi.fn()}
+        onSelectChat={vi.fn()}
+        onDeleteChat={vi.fn()}
+        onComposerTextChange={vi.fn()}
+        onMessageSubmit={vi.fn()}
+        onMessageFeedbackSubmit={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Good" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Bad" })).toBeDisabled();
+    expect(screen.getByText("フィードバックの送信に失敗しました。")).toBeInTheDocument();
   });
 });

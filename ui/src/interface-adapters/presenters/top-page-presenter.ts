@@ -76,7 +76,9 @@ export class TopPagePresenter {
     options: {
       readonly composerText: string;
       readonly composerErrorMessage: string | null;
+      readonly feedbackErrorMessages: Readonly<Record<string, string>>;
       readonly isDrawerOpen: boolean;
+      readonly submittingFeedbackMessageIds: ReadonlySet<string>;
       readonly isSubmittingMessage: boolean;
     }
   ): TopPageViewModel {
@@ -126,10 +128,21 @@ export class TopPagePresenter {
             isPending: message.status === "pending",
             feedbackAvailable:
               message.senderType === "ai" && message.status === "completed",
+            feedbackState: message.aiFeedback,
+            isGoodFeedbackActive: message.aiFeedback === true,
+            isBadFeedbackActive: message.aiFeedback === false,
+            isFeedbackSubmitting:
+              options.submittingFeedbackMessageIds.has(message.id),
+            feedbackErrorMessage:
+              options.feedbackErrorMessages[message.id] ?? null,
+            goodFeedbackLabel: "Good",
+            badFeedbackLabel: "Bad",
           })),
         composer: {
           value: options.composerText,
           inputPlaceholder: "メッセージを入力",
+          helperText:
+            "AI の回答を訂正したい場合も、そのままメッセージとして送信できます。",
           submitLabel: options.isSubmittingMessage ? "送信中..." : "送信",
           errorMessage: options.composerErrorMessage,
           isInputDisabled: options.isSubmittingMessage || hasPendingMessage,

@@ -410,6 +410,204 @@ describe("TopRoute workspace behavior", () => {
     expect(screen.getAllByText("新しい会話").length).toBeGreaterThan(0);
   });
 
+  it("submits feedback and updates the active state locally without waiting for a refetch", async () => {
+    const user = userEvent.setup();
+    let detailRequestCount = 0;
+    let currentFeedback: boolean | null = null;
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        const method = init?.method ?? "GET";
+
+        if (method === "GET" && url === "/api/chats") {
+          return createJsonResponse([
+            {
+              channel_id: "channel-1",
+              channel_name: "フィードバック確認",
+              last_messaged_at: "2026-05-28T10:01:00.000Z",
+            },
+          ]);
+        }
+
+        if (method === "GET" && url === "/api/chats/channel-1") {
+          detailRequestCount += 1;
+
+          return createJsonResponse(
+            createChatDetailResponse({
+              channel_id: "channel-1",
+              channel_name: "フィードバック確認",
+              last_messaged_at: "2026-05-28T10:01:00.000Z",
+              messages: [
+                createMessageResponse({
+                  message_id: "message-user-1",
+                  sender_type: "user",
+                  message_text: "この回答を評価したいです。",
+                  status: "completed",
+                  ai_feedback: null,
+                  created_at: "2026-05-28T10:00:00.000Z",
+                }),
+                createMessageResponse({
+                  message_id: "message-ai-1",
+                  sender_type: "ai",
+                  message_text: "評価対象のAI回答です。",
+                  status: "completed",
+                  ai_feedback: currentFeedback,
+                  created_at: "2026-05-28T10:01:00.000Z",
+                }),
+              ],
+            })
+          );
+        }
+
+        if (
+          method === "POST" &&
+          url === "/api/chats/channel-1/messages/message-ai-1/feedback"
+        ) {
+          const body =
+            typeof init?.body === "string"
+              ? JSON.parse(init.body)
+              : { ai_feedback: null };
+          currentFeedback =
+            currentFeedback === body.ai_feedback ? null : body.ai_feedback;
+
+          return createJsonResponse({
+            message_id: "message-ai-1",
+            ai_feedback: currentFeedback,
+          });
+        }
+
+        throw new Error(`Unhandled request: ${method} ${url}`);
+      })
+    );
+
+    renderTopRoute();
+
+    const messageBody = await screen.findByText("評価対象のAI回答です。");
+    const messageCard = messageBody.closest("article");
+
+    expect(messageCard).not.toBeNull();
+    expect(detailRequestCount).toBe(1);
+
+    const goodButton = within(messageCard as HTMLElement).getByRole("button", {
+      name: "Good",
+    });
+    const badButton = within(messageCard as HTMLElement).getByRole("button", {
+      name: "Bad",
+    });
+
+    await user.click(goodButton);
+
+    await waitFor(() => {
+      expect(goodButton).toHaveClass("bg-emerald-100");
+    });
+    expect(detailRequestCount).toBe(1);
+
+    await user.click(goodButton);
+
+    await waitFor(() => {
+      expect(goodButton).not.toHaveClass("bg-emerald-100");
+    });
+    expect(detailRequestCount).toBe(1);
+
+    await user.click(badButton);
+
+    await waitFor(() => {
+      expect(badButton).toHaveClass("bg-rose-100");
+    });
+    expect(detailRequestCount).toBe(1);
+  });
+
+  it("shows a feedback error on the target message without breaking the composer", async () => {
+    const user = userEvent.setup();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        const method = init?.method ?? "GET";
+
+        if (method === "GET" && url === "/api/chats") {
+          return createJsonResponse([
+            {
+              channel_id: "channel-1",
+              channel_name: "フィードバック失敗確認",
+              last_messaged_at: "2026-05-28T10:01:00.000Z",
+            },
+          ]);
+        }
+
+        if (method === "GET" && url === "/api/chats/channel-1") {
+          return createJsonResponse(
+            createChatDetailResponse({
+              channel_id: "channel-1",
+              channel_name: "フィードバック失敗確認",
+              last_messaged_at: "2026-05-28T10:01:00.000Z",
+              messages: [
+                createMessageResponse({
+                  message_id: "message-user-1",
+                  sender_type: "user",
+                  message_text: "この回答を評価したいです。",
+                  status: "completed",
+                  ai_feedback: null,
+                  created_at: "2026-05-28T10:00:00.000Z",
+                }),
+                createMessageResponse({
+                  message_id: "message-ai-1",
+                  sender_type: "ai",
+                  message_text: "評価対象のAI回答です。",
+                  status: "completed",
+                  ai_feedback: null,
+                  created_at: "2026-05-28T10:01:00.000Z",
+                }),
+              ],
+            })
+          );
+        }
+
+        if (
+          method === "POST" &&
+          url === "/api/chats/channel-1/messages/message-ai-1/feedback"
+        ) {
+          return createJsonResponse(
+            {
+              message: "pending の AI メッセージには評価できません。",
+            },
+            422
+          );
+        }
+
+        throw new Error(`Unhandled request: ${method} ${url}`);
+      })
+    );
+
+    renderTopRoute();
+
+    const messageBody = await screen.findByText("評価対象のAI回答です。");
+    const messageCard = messageBody.closest("article");
+
+    expect(messageCard).not.toBeNull();
+
+    await user.click(
+      within(messageCard as HTMLElement).getByRole("button", { name: "Bad" })
+    );
+
+    await waitFor(() => {
+      expect(
+        within(messageCard as HTMLElement).getByText(
+          "pending の AI メッセージには評価できません。"
+        )
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByRole("textbox", { name: "メッセージ入力" })).toBeEnabled();
+    expect(
+      screen.getByText(
+        "AI の回答を訂正したい場合も、そのままメッセージとして送信できます。"
+      )
+    ).toBeInTheDocument();
+  });
+
   it("appends a new user message, refreshes sidebar data, and shows pending state for an existing chat", async () => {
     const user = userEvent.setup();
     let sentMessage = false;

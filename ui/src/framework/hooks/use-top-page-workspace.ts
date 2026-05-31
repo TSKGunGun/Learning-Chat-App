@@ -18,6 +18,7 @@ interface UseTopPageWorkspaceResult {
   readonly selectChat: (channelId: string) => void;
   readonly deleteChat: (channelId: string) => void;
   readonly submitMessage: () => void;
+  readonly submitMessageFeedback: (messageId: string, aiFeedback: boolean) => void;
   readonly updateComposerText: (nextValue: string) => void;
   readonly setDrawerOpen: (open: boolean) => void;
 }
@@ -56,6 +57,11 @@ export function useTopPageWorkspace(): UseTopPageWorkspaceResult {
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(
     null
   );
+  const [feedbackErrorMessages, setFeedbackErrorMessages] = useState<
+    Readonly<Record<string, string>>
+  >({});
+  const [submittingFeedbackMessageIds, setSubmittingFeedbackMessageIds] =
+    useState<ReadonlySet<string>>(new Set());
   const [isSubmittingMessage, setIsSubmittingMessage] = useState(false);
   const isActiveRef = useRef(true);
   const workspaceRef = useRef<TopPageWorkspaceState | null>(null);
@@ -114,6 +120,22 @@ export function useTopPageWorkspace(): UseTopPageWorkspaceResult {
     }
 
     setComposerErrorMessage(readErrorMessage(nextError, fallbackMessage));
+  };
+
+  const reportFeedbackInlineError = (
+    messageId: string,
+    nextError: unknown,
+    fallbackMessage: string
+  ) => {
+    if (nextError instanceof UnauthorizedRequestError) {
+      promoteToRouteError(nextError);
+      return;
+    }
+
+    setFeedbackErrorMessages((currentMessages) => ({
+      ...currentMessages,
+      [messageId]: readErrorMessage(nextError, fallbackMessage),
+    }));
   };
 
   const refreshChannelsInPlace = async (
@@ -366,7 +388,9 @@ export function useTopPageWorkspace(): UseTopPageWorkspaceResult {
         : container.topPageController.present(workspace, {
             composerText,
             composerErrorMessage,
+            feedbackErrorMessages,
             isDrawerOpen,
+            submittingFeedbackMessageIds,
             isSubmittingMessage,
           }),
     startNewChat: () => {
@@ -391,6 +415,70 @@ export function useTopPageWorkspace(): UseTopPageWorkspaceResult {
       });
     },
     submitMessage,
+    submitMessageFeedback: (messageId: string, aiFeedback: boolean) => {
+      const currentWorkspace = workspaceRef.current;
+
+      if (
+        currentWorkspace === null ||
+        currentWorkspace.selection.type !== "existing" ||
+        submittingFeedbackMessageIds.has(messageId)
+      ) {
+        return;
+      }
+
+      setFeedbackErrorMessages((currentMessages) => {
+        if (!(messageId in currentMessages)) {
+          return currentMessages;
+        }
+
+        const nextMessages = { ...currentMessages };
+        delete nextMessages[messageId];
+        return nextMessages;
+      });
+      setSubmittingFeedbackMessageIds((currentMessageIds) => {
+        const nextMessageIds = new Set(currentMessageIds);
+        nextMessageIds.add(messageId);
+        return nextMessageIds;
+      });
+      const sequence = workspaceSequenceRef.current;
+
+      void (async () => {
+        try {
+          const nextWorkspace =
+            await container.topPageController.submitMessageFeedback(
+              currentWorkspace,
+              messageId,
+              aiFeedback
+            );
+
+          if (!isActiveRef.current || sequence !== workspaceSequenceRef.current) {
+            return;
+          }
+
+          commitWorkspace(nextWorkspace);
+          setError(null);
+          setHasError(false);
+        } catch (nextError) {
+          if (!isActiveRef.current || sequence !== workspaceSequenceRef.current) {
+            return;
+          }
+
+          reportFeedbackInlineError(
+            messageId,
+            nextError,
+            "フィードバックの送信に失敗しました。"
+          );
+        } finally {
+          if (isActiveRef.current) {
+            setSubmittingFeedbackMessageIds((currentMessageIds) => {
+              const nextMessageIds = new Set(currentMessageIds);
+              nextMessageIds.delete(messageId);
+              return nextMessageIds;
+            });
+          }
+        }
+      })();
+    },
     updateComposerText: (nextValue: string) => {
       setComposerText(nextValue);
       if (composerErrorMessage !== null) {
